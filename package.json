@@ -1,0 +1,46 @@
+{
+  "name": "knesset-mcp",
+  "version": "1.1.1",
+  "description": "MCP server for the Israeli Knesset parliamentary information API",
+  "type": "module",
+  "main": "build/knesset-mcp-server.js",
+  "bin": {
+    "knesset-mcp": "build/knesset-mcp-server.js"
+  },
+  "files": [
+    "build",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/knesset-mcp-server.js",
+    "dev": "ts-node-esm knesset-mcp-server.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "knesset",
+    "parliament",
+    "israel",
+    "odata"
+  ],
+  "author": "Zohar Stolar",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zohar/knesset-mcp.git"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}
