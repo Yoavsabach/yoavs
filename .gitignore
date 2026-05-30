@@ -3,3 +3,5 @@ node_modules
 package-lock.json
 *.log
 .mcp.json
+!claude-for-legal/**/.mcp.json
+!claude-for-legal/**/.mcp.json/**
