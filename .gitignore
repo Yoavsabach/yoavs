@@ -12,3 +12,7 @@ skills/*-workspace/iteration-*/**/outputs/
 __pycache__/
 *.pyc
 skills/*-workspace/review-*.html
+
+# פלט חי של לולאת אופטימיזציית ה-description — נוצר מחדש בהרצה
+skills/*-workspace/desc-opt/
+skills/*-workspace/*.log
