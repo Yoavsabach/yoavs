@@ -5,3 +5,17 @@ package-lock.json
 .mcp.json
 !claude-for-legal/**/.mcp.json
 !claude-for-legal/**/.mcp.json/**
+
+# תוצרי הרצות eval של סקילים — בינאריים וכבדים, נוצרים מחדש בהרצה
+skills/*-workspace/iteration-*/**/outputs/
+
+__pycache__/
+*.pyc
+skills/*-workspace/review-*.html
+
+# פלט חי של לולאת אופטימיזציית ה-description — נוצר מחדש בהרצה
+skills/*-workspace/desc-opt/
+skills/*-workspace/*.log
+
+# חבילת הסקיל — נבנית מחדש עם package_skill
+skills/*.skill

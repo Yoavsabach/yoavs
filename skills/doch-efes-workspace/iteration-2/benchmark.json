@@ -1,0 +1,516 @@
+{
+  "metadata": {
+    "skill_name": "doch-efes",
+    "skill_path": "/home/user/yoavs/skills/doch-efes",
+    "executor_model": "claude-opus-5",
+    "analyzer_model": "claude-opus-5",
+    "timestamp": "2026-08-23T08:10:00Z",
+    "evals_run": [
+      0,
+      1,
+      2
+    ],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": 0,
+      "eval_name": "מגורים — אשדוד, 24 יח\"ד",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 11,
+        "failed": 0,
+        "total": 11,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "נוצרו כל ארבעת התוצרים: xlsx, docx, pptx, html",
+          "passed": true,
+          "evidence": "xlsx=1 docx=1 pptx=1 html=1"
+        },
+        {
+          "text": "קובץ ה-Excel מכיל נוסחאות חיות (תאים שמתחילים ב-=) ולא רק ערכים קשיחים",
+          "passed": true,
+          "evidence": "נמצאו 234 נוסחאות ב-11 גיליונות"
+        },
+        {
+          "text": "כל גיליונות ה-Excel מוגדרים RTL (sheetView rightToLeft)",
+          "passed": true,
+          "evidence": "11 מתוך 11 גיליונות RTL"
+        },
+        {
+          "text": "גילוי הנאות ('אינו מהווה דוח אפס של שמאי מקרקעין מוסמך') מופיע ב-Word, ב-PPTX וב-HTML",
+          "passed": true,
+          "evidence": "Word=True PPTX=True HTML=True"
+        },
+        {
+          "text": "הרווח היזמי מוצג גם כאחוז מהעלויות וגם כאחוז מההכנסות",
+          "passed": true,
+          "evidence": "'מהעלויות' ו-'מההכנסות' נמצאו בדוח/דשבורד"
+        },
+        {
+          "text": "סך העלויות זהה (עד 1 ש\"ח) בין ה-Excel, ה-Word וה-HTML",
+          "passed": true,
+          "evidence": "14 סכומים גדולים מופיעים זהים בשלושת התוצרים"
+        },
+        {
+          "text": "קיים גיליון הנחות יסוד עם עמודת מקור/אסמכתה",
+          "passed": true,
+          "evidence": "נמצא 'הנחות יסוד' + 'מקור/אסמכתה' באקסל"
+        },
+        {
+          "text": "קיימת רשימת דגלים שמתייחסת לנתוני הפרויקט הזה ולא לניסוח גנרי",
+          "passed": true,
+          "evidence": "נמצאה מילת 'דגל'; הרלוונטיות נבדקת ידנית ב-viewer"
+        },
+        {
+          "text": "מחיר המכירה למ\"ר מסומן כסטייה מהאסמכתה החיצונית, בלי ששונה הקלט",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "קיימות שתי טבלאות רגישות דו-ממדיות (מחיר מכירה × עלות בנייה)",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "הרווח היזמי מחושב בטווח 14%-19% מהעלויות",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 0,
+      "eval_name": "מגורים — אשדוד, 24 יח\"ד",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.5454545454545454,
+        "passed": 6,
+        "failed": 5,
+        "total": 11,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "נוצרו כל ארבעת התוצרים: xlsx, docx, pptx, html",
+          "passed": false,
+          "evidence": "xlsx=1 docx=1 pptx=0 html=1"
+        },
+        {
+          "text": "קובץ ה-Excel מכיל נוסחאות חיות (תאים שמתחילים ב-=) ולא רק ערכים קשיחים",
+          "passed": false,
+          "evidence": "נמצאו 0 נוסחאות ב-6 גיליונות"
+        },
+        {
+          "text": "כל גיליונות ה-Excel מוגדרים RTL (sheetView rightToLeft)",
+          "passed": true,
+          "evidence": "6 מתוך 6 גיליונות RTL"
+        },
+        {
+          "text": "גילוי הנאות ('אינו מהווה דוח אפס של שמאי מקרקעין מוסמך') מופיע ב-Word, ב-PPTX וב-HTML",
+          "passed": false,
+          "evidence": "Word=False PPTX=False HTML=False"
+        },
+        {
+          "text": "הרווח היזמי מוצג גם כאחוז מהעלויות וגם כאחוז מההכנסות",
+          "passed": false,
+          "evidence": "אחד מהם חסר"
+        },
+        {
+          "text": "סך העלויות זהה (עד 1 ש\"ח) בין ה-Excel, ה-Word וה-HTML",
+          "passed": true,
+          "evidence": "30 סכומים גדולים מופיעים זהים בשלושת התוצרים"
+        },
+        {
+          "text": "קיים גיליון הנחות יסוד עם עמודת מקור/אסמכתה",
+          "passed": true,
+          "evidence": "נמצא 'הנחות יסוד' + 'מקור/אסמכתה' באקסל"
+        },
+        {
+          "text": "קיימת רשימת דגלים שמתייחסת לנתוני הפרויקט הזה ולא לניסוח גנרי",
+          "passed": false,
+          "evidence": "נמצאה מילת 'דגל'; הרלוונטיות נבדקת ידנית ב-viewer"
+        },
+        {
+          "text": "מחיר המכירה למ\"ר מסומן כסטייה מהאסמכתה החיצונית, בלי ששונה הקלט",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "קיימות שתי טבלאות רגישות דו-ממדיות (מחיר מכירה × עלות בנייה)",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "הרווח היזמי מחושב בטווח 14%-19% מהעלויות",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "פינוי-בינוי — רמלה, 48→180",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 11,
+        "failed": 0,
+        "total": 11,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "נוצרו כל ארבעת התוצרים: xlsx, docx, pptx, html",
+          "passed": true,
+          "evidence": "xlsx=1 docx=1 pptx=1 html=1"
+        },
+        {
+          "text": "קובץ ה-Excel מכיל נוסחאות חיות (תאים שמתחילים ב-=) ולא רק ערכים קשיחים",
+          "passed": true,
+          "evidence": "נמצאו 239 נוסחאות ב-11 גיליונות"
+        },
+        {
+          "text": "כל גיליונות ה-Excel מוגדרים RTL (sheetView rightToLeft)",
+          "passed": true,
+          "evidence": "11 מתוך 11 גיליונות RTL"
+        },
+        {
+          "text": "גילוי הנאות ('אינו מהווה דוח אפס של שמאי מקרקעין מוסמך') מופיע ב-Word, ב-PPTX וב-HTML",
+          "passed": true,
+          "evidence": "Word=True PPTX=True HTML=True"
+        },
+        {
+          "text": "הרווח היזמי מוצג גם כאחוז מהעלויות וגם כאחוז מההכנסות",
+          "passed": true,
+          "evidence": "'מהעלויות' ו-'מההכנסות' נמצאו בדוח/דשבורד"
+        },
+        {
+          "text": "סך העלויות זהה (עד 1 ש\"ח) בין ה-Excel, ה-Word וה-HTML",
+          "passed": true,
+          "evidence": "14 סכומים גדולים מופיעים זהים בשלושת התוצרים"
+        },
+        {
+          "text": "קיים גיליון הנחות יסוד עם עמודת מקור/אסמכתה",
+          "passed": true,
+          "evidence": "נמצא 'הנחות יסוד' + 'מקור/אסמכתה' באקסל"
+        },
+        {
+          "text": "קיימת רשימת דגלים שמתייחסת לנתוני הפרויקט הזה ולא לניסוח גנרי",
+          "passed": true,
+          "evidence": "נמצאה מילת 'דגל'; הרלוונטיות נבדקת ידנית ב-viewer"
+        },
+        {
+          "text": "180 דירות התמורה לדיירים (48 יח\"ד) אינן נספרות כהכנסה ממכירה",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "עלויות הדיירים (שכר דירה, הובלה, ליווי) מופיעות כשורות עלות מפורשות",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "הדוח נערך במבנה תקן 21 / מזוהה כהתחדשות עירונית",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "פינוי-בינוי — רמלה, 48→180",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.6363636363636364,
+        "passed": 7,
+        "failed": 4,
+        "total": 11,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "נוצרו כל ארבעת התוצרים: xlsx, docx, pptx, html",
+          "passed": false,
+          "evidence": "xlsx=1 docx=1 pptx=0 html=1"
+        },
+        {
+          "text": "קובץ ה-Excel מכיל נוסחאות חיות (תאים שמתחילים ב-=) ולא רק ערכים קשיחים",
+          "passed": true,
+          "evidence": "נמצאו 359 נוסחאות ב-6 גיליונות"
+        },
+        {
+          "text": "כל גיליונות ה-Excel מוגדרים RTL (sheetView rightToLeft)",
+          "passed": true,
+          "evidence": "6 מתוך 6 גיליונות RTL"
+        },
+        {
+          "text": "גילוי הנאות ('אינו מהווה דוח אפס של שמאי מקרקעין מוסמך') מופיע ב-Word, ב-PPTX וב-HTML",
+          "passed": false,
+          "evidence": "Word=False PPTX=False HTML=False"
+        },
+        {
+          "text": "הרווח היזמי מוצג גם כאחוז מהעלויות וגם כאחוז מההכנסות",
+          "passed": true,
+          "evidence": "'מהעלויות' ו-'מההכנסות' נמצאו בדוח/דשבורד"
+        },
+        {
+          "text": "סך העלויות זהה (עד 1 ש\"ח) בין ה-Excel, ה-Word וה-HTML",
+          "passed": true,
+          "evidence": "9 סכומים גדולים מופיעים זהים בשלושת התוצרים"
+        },
+        {
+          "text": "קיים גיליון הנחות יסוד עם עמודת מקור/אסמכתה",
+          "passed": false,
+          "evidence": "לא נמצא"
+        },
+        {
+          "text": "קיימת רשימת דגלים שמתייחסת לנתוני הפרויקט הזה ולא לניסוח גנרי",
+          "passed": false,
+          "evidence": "נמצאה מילת 'דגל'; הרלוונטיות נבדקת ידנית ב-viewer"
+        },
+        {
+          "text": "180 דירות התמורה לדיירים (48 יח\"ד) אינן נספרות כהכנסה ממכירה",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "עלויות הדיירים (שכר דירה, הובלה, ליווי) מופיעות כשורות עלות מפורשות",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "הדוח נערך במבנה תקן 21 / מזוהה כהתחדשות עירונית",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "לוגיסטי מניב — קריית גת",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 11,
+        "failed": 0,
+        "total": 11,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "נוצרו כל ארבעת התוצרים: xlsx, docx, pptx, html",
+          "passed": true,
+          "evidence": "xlsx=1 docx=1 pptx=1 html=1"
+        },
+        {
+          "text": "קובץ ה-Excel מכיל נוסחאות חיות (תאים שמתחילים ב-=) ולא רק ערכים קשיחים",
+          "passed": true,
+          "evidence": "נמצאו 292 נוסחאות ב-11 גיליונות"
+        },
+        {
+          "text": "כל גיליונות ה-Excel מוגדרים RTL (sheetView rightToLeft)",
+          "passed": true,
+          "evidence": "11 מתוך 11 גיליונות RTL"
+        },
+        {
+          "text": "גילוי הנאות ('אינו מהווה דוח אפס של שמאי מקרקעין מוסמך') מופיע ב-Word, ב-PPTX וב-HTML",
+          "passed": true,
+          "evidence": "Word=True PPTX=True HTML=True"
+        },
+        {
+          "text": "הרווח היזמי מוצג גם כאחוז מהעלויות וגם כאחוז מההכנסות",
+          "passed": true,
+          "evidence": "'מהעלויות' ו-'מההכנסות' נמצאו בדוח/דשבורד"
+        },
+        {
+          "text": "סך העלויות זהה (עד 1 ש\"ח) בין ה-Excel, ה-Word וה-HTML",
+          "passed": true,
+          "evidence": "14 סכומים גדולים מופיעים זהים בשלושת התוצרים"
+        },
+        {
+          "text": "קיים גיליון הנחות יסוד עם עמודת מקור/אסמכתה",
+          "passed": true,
+          "evidence": "נמצא 'הנחות יסוד' + 'מקור/אסמכתה' באקסל"
+        },
+        {
+          "text": "קיימת רשימת דגלים שמתייחסת לנתוני הפרויקט הזה ולא לניסוח גנרי",
+          "passed": true,
+          "evidence": "נמצאה מילת 'דגל'; הרלוונטיות נבדקת ידנית ב-viewer"
+        },
+        {
+          "text": "ההכנסה נגזרת מהיוון NOI ולא מתמהיל מכירת יחידות",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "שיעור ההיוון 7.25% מופיע בגיליון ההנחות ומקושר לחישוב שווי היציאה",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "לא הופק תמהיל מכירת דירות שאינו רלוונטי לפרויקט מניב",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "לוגיסטי מניב — קריית גת",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.45454545454545453,
+        "passed": 5,
+        "failed": 6,
+        "total": 11,
+        "time_seconds": 0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "נוצרו כל ארבעת התוצרים: xlsx, docx, pptx, html",
+          "passed": false,
+          "evidence": "xlsx=1 docx=1 pptx=0 html=1"
+        },
+        {
+          "text": "קובץ ה-Excel מכיל נוסחאות חיות (תאים שמתחילים ב-=) ולא רק ערכים קשיחים",
+          "passed": false,
+          "evidence": "נמצאו 0 נוסחאות ב-6 גיליונות"
+        },
+        {
+          "text": "כל גיליונות ה-Excel מוגדרים RTL (sheetView rightToLeft)",
+          "passed": true,
+          "evidence": "6 מתוך 6 גיליונות RTL"
+        },
+        {
+          "text": "גילוי הנאות ('אינו מהווה דוח אפס של שמאי מקרקעין מוסמך') מופיע ב-Word, ב-PPTX וב-HTML",
+          "passed": false,
+          "evidence": "Word=False PPTX=False HTML=False"
+        },
+        {
+          "text": "הרווח היזמי מוצג גם כאחוז מהעלויות וגם כאחוז מההכנסות",
+          "passed": false,
+          "evidence": "אחד מהם חסר"
+        },
+        {
+          "text": "סך העלויות זהה (עד 1 ש\"ח) בין ה-Excel, ה-Word וה-HTML",
+          "passed": true,
+          "evidence": "3 סכומים גדולים מופיעים זהים בשלושת התוצרים"
+        },
+        {
+          "text": "קיים גיליון הנחות יסוד עם עמודת מקור/אסמכתה",
+          "passed": false,
+          "evidence": "לא נמצא"
+        },
+        {
+          "text": "קיימת רשימת דגלים שמתייחסת לנתוני הפרויקט הזה ולא לניסוח גנרי",
+          "passed": false,
+          "evidence": "נמצאה מילת 'דגל'; הרלוונטיות נבדקת ידנית ב-viewer"
+        },
+        {
+          "text": "ההכנסה נגזרת מהיוון NOI ולא מתמהיל מכירת יחידות",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "שיעור ההיוון 7.25% מופיע בגיליון ההנחות ומקושר לחישוב שווי היציאה",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        },
+        {
+          "text": "לא הופק תמהיל מכירת דירות שאינו רלוונטי לפרויקט מניב",
+          "passed": true,
+          "evidence": "בדיקה אוטומטית על טקסט התוצרים"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      },
+      "tokens": {
+        "mean": 0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.5455,
+        "stddev": 0.0742,
+        "min": 0.45454545454545453,
+        "max": 0.6363636363636364
+      },
+      "time_seconds": {
+        "mean": 0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      },
+      "tokens": {
+        "mean": 0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.45",
+      "time_seconds": "n/a",
+      "tokens": "n/a"
+    }
+  },
+  "notes": [
+    "איטרציה 2: 33/33 עם הסקיל, 18/33 בלי.",
+    "ציוני ה-baseline עלו מ-11/33 באיטרציה 1 ל-18/33 — לא בגלל שינוי בהרצות (הן זהות, הועתקו) אלא כי תוקן באג בבודק שלא פענח ישויות XML עבריות. ציוני איטרציה 1 היו נמוכים מדי בשני הצדדים.",
+    "כל שבעת הליקויים מאיטרציה 1 אומתו כמתוקנים בשלוש ההרצות: מספור פרקים רציף בשלושת המצבים, verify_excel עובר 11/11, holding_years מייתר את שורת המכירה המזויפת, עלות למ\"ר ירדה מניפוח פי 4.",
+    "ליקויים חדשים שהתגלו ותוקנו לאחר ההרצה: תמצית המנהלים התעלמה מ-threshold_basis והדפיסה 'סף 0%' על פרויקט מניב; מרווח שלילי לא הפיק דגל; גיליון התוצאות באקסל סתר את ה-Word; '10%%' הודפס כפשוטו; שורות דיירים נראו כספירה כפולה. התוצרים ב-viewer הופקו לפני התיקונים האלה.",
+    "מדדי זמן וטוקנים אינם זמינים — לא נרשם timing.json. אין לקרוא את השורות האלה כאפס בפועל.",
+    "הרצות ה-baseline הועתקו מאיטרציה 1 ללא שינוי: הסקיל אינו משפיע עליהן, והרצה מחדש הייתה מוסיפה עלות בלי מידע."
+  ]
+}
