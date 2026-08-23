@@ -1,0 +1,116 @@
+{
+  "_comment": "דוגמה מלאה למבנה project.json. העתק, מלא בנתוני הפרויקט האמיתיים, והרץ את model.py. כל שדה שמושמט מקבל ברירת מחדל שמרנית — אבל שדה שמושמט בלי שהמשתמש נשאל עליו הוא ליקוי, לא ברירת מחדל.",
+
+  "meta": {
+    "project_name": "פרויקט מגורים — רחוב הרצל, אשדוד",
+    "client": "יזם לדוגמה בע\"מ",
+    "location": "אשדוד",
+    "gush": "2065",
+    "helka": "112",
+    "migrash": "304",
+    "plan": "תב\"ע 604-0123456, אושרה 12.03.2025",
+    "date": "2026-08-23",
+    "mode": "takan21",
+    "preparer": "עו\"ד יואב סבח, ASCB אשדוד"
+  },
+
+  "indexation": {
+    "build_index_uplift_pct": 3.0,
+    "index_base": "מדד תשומות הבנייה למגורים, נקודת בסיס ותאריך — למלא מ-israeli-statistics",
+    "source": ""
+  },
+
+  "land": {
+    "purchase_price": 9000000,
+    "purchase_tax_rate": 6.0,
+    "legal_pct": 1.0,
+    "brokerage_pct": 2.0,
+    "development_levies": 900000,
+    "other": 0,
+    "source": ""
+  },
+
+  "areas": [
+    {"use": "מגורים", "label": "שטח עיקרי מגורים", "sqm": 2760, "cost_per_sqm": 7200, "source": ""},
+    {"use": "מגורים", "label": "שטחי שירות מעל הקרקע (מרפסות, חדרי מדרגות)", "sqm": 690, "cost_per_sqm": 4300, "source": ""},
+    {"use": "מרתף", "label": "מרתפים ומיגון", "sqm": 480, "cost_per_sqm": 4800, "source": ""}
+  ],
+
+  "parking": {"spaces": 30, "cost_per_space": 95000, "sqm_per_space": 35, "source": ""},
+
+  "direct_other": [
+    {"label": "עבודות פיתוח ותשתית באתר", "amount": 850000, "source": ""}
+  ],
+
+  "indirect": [
+    {"label": "תכנון ויועצים", "basis": "direct", "pct": 6.0, "source": ""},
+    {"label": "ניהול ופיקוח", "basis": "direct", "pct": 3.0, "source": ""},
+    {"label": "אגרות בנייה והיטלי פיתוח", "basis": "fixed", "amount": 1200000, "source": ""},
+    {"label": "שיווק ומכירות", "basis": "revenue", "pct": 2.0, "source": ""},
+    {"label": "הוצאות משפטיות", "basis": "revenue", "pct": 0.7, "source": ""},
+    {"label": "ביטוח קבלנים ובדק", "basis": "direct", "pct": 1.2, "source": ""},
+    {"label": "הנהלה וכלליות", "basis": "direct", "pct": 2.0, "source": ""}
+  ],
+
+  "tax": {
+    "developer_type": "company",
+    "corporate_tax_pct": 23.0,
+    "individual_tax_pct": 50.0,
+    "vat_pct": 18.0,
+    "betterment_levy": 1200000,
+    "betterment_source": "אומדן — property-planning-law-expert",
+    "rmi_permit_fee": 0,
+    "rmi_source": ""
+  },
+
+  "contingency_pct": 6.0,
+  "contingency_base": "direct_and_indirect",
+
+  "revenue": {
+    "prices_include_vat": true,
+    "items": [
+      {"label": "24 יח\"ד מגורים", "units": 24, "avg_sqm": 115, "price_per_sqm": 25700, "source": ""}
+    ]
+  },
+
+  "income_asset": null,
+
+  "finance": {
+    "equity": 10000000,
+    "credit_rate_pct": 7.5,
+    "prime": 6.0,
+    "spread": 1.5,
+    "fees_pct": 0.75,
+    "warranty_pct": 1.2,
+    "loan_limit": null
+  },
+
+  "schedule": {
+    "start": "2026-10-01",
+    "quarters": 12,
+    "land_curve":    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "cost_curve":    [0, 1, 2, 3, 4, 5, 5, 5, 4, 3, 2, 1],
+    "revenue_curve": [0, 1, 2, 2, 3, 3, 4, 4, 5, 6, 8, 12]
+  },
+
+  "thresholds": {"min_profit_on_cost_pct": 15.0},
+
+  "sensitivity": {
+    "price_steps": [-10, -5, 0, 5, 10],
+    "cost_steps": [-10, -5, 0, 5, 10],
+    "rate_steps_pp": [-1, 0, 1, 2, 3]
+  },
+
+  "benchmarks": [
+    {"label": "מחיר מכירה למ\"ר מגורים (₪)", "used": 25700, "reference": 24200,
+     "source": "עסקאות השוואה, מאגר רשות המסים", "source_date": "23.08.2026"},
+    {"label": "עלות בנייה ישירה למ\"ר מגורים (₪)", "used": 7200, "reference": 7000,
+     "source": "cost-benchmarks.md", "source_date": "23.08.2026"}
+  ],
+
+  "flags": [],
+
+  "assumptions_notes": [
+    {"label": "מצב תכנוני", "value": "תב\"ע מאושרת, זכויות מנוצלות במלואן", "source": "property-planning-law-expert"}
+  ]
+}

@@ -5,3 +5,6 @@ package-lock.json
 .mcp.json
 !claude-for-legal/**/.mcp.json
 !claude-for-legal/**/.mcp.json/**
+
+# תוצרי הרצות eval של סקילים — בינאריים וכבדים, נוצרים מחדש בהרצה
+skills/*-workspace/iteration-*/**/outputs/
