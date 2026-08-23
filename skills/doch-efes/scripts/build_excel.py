@@ -390,21 +390,19 @@ class Builder:
                 "היוון NOI שנתי בשיעור ההיוון שבהנחות",
             ], fmts=[None, QTY, SQM, None, NIS0, NIS0, None])
 
-        r = self.line(ws, r, ["סה\"כ הכנסות", "", "", "",
-                              "=SUM(E%d:E%d)" % (first, r - 1),
-                              "=SUM(F%d:F%d)" % (first, r - 1), ""],
-                      fmts=[None, None, None, None, NIS0, NIS0, None], bold=True, fill=TOT_FILL)
+        last_data = r - 1
+        # עמודה C בשורת הסיכום מחזיקה את סך השטח המכיר (יחידות × שטח ממוצע),
+        # שממנו נגזרת "עלות למ"ר מכור". זה השטח שנמכר בפועל — בפינוי-בינוי הוא
+        # קטן מהשטח הבנוי, כי דירות התמורה נבנות ואינן נמכרות.
+        r = self.line(ws, r, ["סה\"כ הכנסות (ושטח מכיר)", "",
+                              "=SUMPRODUCT(B%d:B%d,C%d:C%d)" % (first, last_data, first, last_data),
+                              "",
+                              "=SUM(E%d:E%d)" % (first, last_data),
+                              "=SUM(F%d:F%d)" % (first, last_data), ""],
+                      fmts=[None, None, SQM, None, NIS0, NIS0, None], bold=True, fill=TOT_FILL)
         self.ref["TOTAL_REVENUE_GROSS"] = "'הכנסות'!$E$%d" % (r - 1)
         self.ref["TOTAL_REVENUE_NET"] = "'הכנסות'!$F$%d" % (r - 1)
         self.ref["SELLABLE_SQM"] = "'הכנסות'!$C$%d" % (r - 1)
-        # שטח מכיר כולל, לצורך עלות למ"ר מכור
-        ws.cell(row=r, column=3, value="=SUMPRODUCT(B%d:B%d,C%d:C%d)" % (first, r - 2, first, r - 2))
-        ws.cell(row=r, column=3).number_format = SQM
-        ws.cell(row=r, column=3).font = BOLD
-        ws.cell(row=r, column=3).fill = TOT_FILL
-        ws.cell(row=r, column=3).border = BOX
-        self.ref["SELLABLE_SQM"] = "'הכנסות'!$C$%d" % r
-        ws.cell(row=r, column=1, value="שטח מכיר כולל").font = SMALL
         return ws
 
     # -- 6. בצ"מ ומיסוי ----------------------------------------------------
