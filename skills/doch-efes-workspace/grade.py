@@ -12,6 +12,7 @@ grade.py — בודק אוטומטית את הקריטריונים המכניי�
     python3 grade.py <workspace>/iteration-N
 """
 
+import html as _html
 import json
 import os
 import re
@@ -30,10 +31,17 @@ def find(d, exts):
     return out
 
 
+def _strip(xml):
+    """מסיר תגיות ומפענח ישויות. openpyxl כותב עברית כישויות מספריות
+    (&#1492;) ולא כטקסט גולמי, ולכן בלי unescape כל חיפוש טקסט עברי בקובץ
+    אקסל נכשל בשקט ומדווח על ליקוי שאינו קיים."""
+    return _html.unescape(re.sub(r"<[^>]+>", " ", xml))
+
+
 def docx_text(path):
     try:
         raw = zipfile.ZipFile(path).read("word/document.xml").decode("utf8", "replace")
-        return re.sub(r"<[^>]+>", "", raw)
+        return _strip(raw)
     except Exception:
         return ""
 
@@ -43,7 +51,7 @@ def pptx_text(path):
         z = zipfile.ZipFile(path)
         parts = [z.read(n).decode("utf8", "replace") for n in z.namelist()
                  if n.startswith("ppt/slides/slide")]
-        return re.sub(r"<[^>]+>", "", "".join(parts))
+        return _strip("".join(parts))
     except Exception:
         return ""
 
@@ -68,7 +76,7 @@ def xlsx_info(path):
             texts.append(xml)
             for m in re.finditer(r"<v>(-?\d+\.?\d*)</v>", xml):
                 info["numbers"].append(float(m.group(1)))
-        info["text"] = re.sub(r"<[^>]+>", " ", "".join(texts))
+        info["text"] = _strip("".join(texts))
     except Exception as exc:
         info["error"] = str(exc)
     return info
