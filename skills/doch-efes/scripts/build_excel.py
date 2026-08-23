@@ -203,6 +203,12 @@ class Builder:
                 add("עלויות עקיפות", "ind_%d" % i, label, num(item.get("pct")), "%",
                     item.get("source", "") or "cost-benchmarks.md")
 
+        # עלויות הדיירים נכנסות כשורות הנחה משלהן, כדי שיהיו ניתנות לשינוי
+        # בתא אחד כמו כל פרמטר אחר — ולא רק כסכום מוגמר בגיליון העקיפות.
+        for i, line in enumerate(self.m.get("tenants", {}).get("lines", []) or []):
+            add("דיירים", "tenant_%d" % i, line["label"], line["amount"], "₪",
+                line.get("source", "") or "תקן 21 ס' 4.14(ד)", NIS0)
+
         tax = p.get("tax", {}) or {}
         add("מיסוי", "vat", "שיעור מע\"מ", num(tax.get("vat_pct"), 18), "%", "tax-rules.md")
         add("מיסוי", "profit_tax", "שיעור מס על הרווח (%s)" %
@@ -225,12 +231,17 @@ class Builder:
             add("הכנסות", "rev_price_%d" % i, "מחיר מכירה למ\"ר — %s" % label,
                 num(item.get("price_per_sqm")), "₪/מ\"ר",
                 item.get("source", "") or "עסקאות השוואה — data-sources.md", NIS0)
+            if item.get("total_price") not in (None, ""):
+                add("הכנסות", "rev_total_%d" % i, "סכום כולל — %s" % label,
+                    num(item.get("total_price")), "₪", item.get("source", ""), NIS0)
 
         ia = p.get("income_asset") or {}
         if ia:
             add("נכס מניב", "noi", "NOI שנתי", num(ia.get("annual_noi")), "₪", ia.get("source", ""), NIS0)
             add("נכס מניב", "cap_rate", "שיעור היוון (Cap Rate)", num(ia.get("cap_rate")), "%",
                 ia.get("source", ""))
+            add("נכס מניב", "holding_years", "שנות החזקה עד המימוש",
+                num(ia.get("holding_years")), "שנים", ia.get("source", ""), QTY)
 
         fin = p.get("finance", {}) or {}
         add("מימון", "equity", "הון עצמי", num(fin.get("equity")), "₪", "", NIS0)
@@ -341,6 +352,23 @@ class Builder:
                     item.get("source", "") or "cost-benchmarks.md",
                 ], fmts=[None, None, PCT, NIS0, None])
 
+        tenants = self.m.get("tenants", {}) or {}
+        if tenants.get("lines"):
+            t_first = r
+            for i, line in enumerate(tenants["lines"]):
+                r = self.line(ws, r, [line["label"], "עלויות טיפול בדיירים", "",
+                                      "=%s" % R["tenant_%d" % i],
+                                      line.get("source", "") or "תקן 21 ס' 4.14(ד)"],
+                              fmts=[None, None, None, NIS0, None])
+            r = self.line(ws, r, ["מזה — סה\"כ עלויות הטיפול בדיירים", "", "",
+                                  "=SUM(D%d:D%d)" % (t_first, r - 1), ""],
+                          fmts=[None, None, None, NIS0, None], bold=True, fill=SUB_FILL)
+            # שורת הסיכום הזו היא תת-סכום להצגה בלבד; היא לא נכללת בסכום הכולל
+            # למטה, אחרת עלויות הדיירים ייספרו פעמיים.
+            t_subtotal_row = r - 1
+        else:
+            t_subtotal_row = None
+
         if num((self.p.get("tax") or {}).get("betterment_levy")):
             r = self.line(ws, r, ["היטל השבחה", "אומדן תכנוני", "", "=%s" % R["betterment"],
                                   (self.p.get("tax") or {}).get("betterment_source", "")],
@@ -350,7 +378,9 @@ class Builder:
                                   (self.p.get("tax") or {}).get("rmi_source", "")],
                           fmts=[None, None, None, NIS0, None])
 
-        r = self.line(ws, r, ["סה\"כ עלויות עקיפות", "", "", "=SUM(D%d:D%d)" % (first, r - 1), ""],
+        total_formula = ("=SUM(D%d:D%d)-D%d" % (first, r - 1, t_subtotal_row)
+                         if t_subtotal_row else "=SUM(D%d:D%d)" % (first, r - 1))
+        r = self.line(ws, r, ["סה\"כ עלויות עקיפות", "", "", total_formula, ""],
                       fmts=[None, None, None, NIS0, None], bold=True, fill=TOT_FILL)
         self.ref["TOTAL_INDIRECT"] = "'עלויות עקיפות'!$D$%d" % (r - 1)
         return ws
@@ -371,17 +401,35 @@ class Builder:
         divisor = "(1+%s/100)" % R["vat"] if incl else "1"
         first = r
         for i, item in enumerate((self.p.get("revenue") or {}).get("items", []) or []):
+            # פריט שהוזן בסכום כולל (total_price) גובר על מכפלת יחידות×שטח×מחיר.
+            # המנוע תמך בזה מלכתחילה והאקסל התעלם, כך שהשניים היו מציגים מספרים
+            # שונים לאותו פריט — ואת זה verify_excel היה תופס רק אחרי המסירה.
+            if item.get("total_price") not in (None, ""):
+                gross = "=%s" % R["rev_total_%d" % i]
+            else:
+                gross = "=B%d*C%d*D%d" % (r, r, r)
             r = self.line(ws, r, [
                 item.get("label", "רכיב הכנסה"),
                 "=%s" % R["rev_units_%d" % i],
                 "=%s" % R["rev_sqm_%d" % i],
                 "=%s" % R["rev_price_%d" % i],
-                "=B%d*C%d*D%d" % (r, r, r),
+                gross,
                 "=E%d/%s" % (r, divisor),
                 item.get("source", "") or "עסקאות השוואה",
             ], fmts=[None, QTY, SQM, NIS0, NIS0, NIS0, None])
 
         ia = self.p.get("income_asset") or {}
+        if ia and num(ia.get("annual_noi")) and num(ia.get("holding_years")):
+            r = self.line(ws, r, [
+                "הכנסות שכירות בתקופת ההחזקה", "=%s" % R["holding_years"],
+                num(ia.get("sqm")), "",
+                "=%s*%s" % (R["noi"], R["holding_years"]),
+                "=E%d/%s" % (r, divisor),
+                "NOI שנתי × שנות החזקה",
+            ], fmts=[None, QTY, SQM, None, NIS0, NIS0, None])
+            # השטח כאן אינו שטח נמכר — אחרת "עלות למ"ר מכור" מתנפח פי שנות
+            # ההחזקה. מתקנים ידנית לאפס בעמודת השטח לצורך הסיכום.
+            ws.cell(row=r - 1, column=3, value=0).number_format = SQM
         if ia and num(ia.get("annual_noi")) and num(ia.get("cap_rate")):
             r = self.line(ws, r, [
                 ia.get("label", "מימוש נכס מניב (Exit)"), 1, num(ia.get("sqm")), "",
@@ -599,7 +647,8 @@ class Builder:
         r = self.line(ws, r, ["תשואה על ההון (ROC)",
                               "=IFERROR(%s/%s,\"\")" % (after_tax, R["equity"]),
                               "רווח לאחר מס חלקי ההון העצמי"], fmts=[None, PCT, None])
-        r = self.line(ws, r, ["עלות למ\"ר מכור",
+        sqm_label = "עלות למ\"ר בנוי" if self.m.get("kind") == "income" else "עלות למ\"ר מכור"
+        r = self.line(ws, r, [sqm_label,
                               "=IFERROR(%s/%s,\"\")" % (self.ref["TOTAL_COST"], R["SELLABLE_SQM"]),
                               "סך העלויות חלקי השטח המכיר"], fmts=[None, NIS0, None])
         r = self.line(ws, r, ["שיא ניצול אשראי", "=%s" % self.ref["PEAK_DEBT"],

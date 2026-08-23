@@ -214,24 +214,49 @@ def build_model(project: dict, price_delta: float = 0.0, cost_delta: float = 0.0
             "gross": gross,
             "net": gross / vat_divisor,
             "sellable_sqm": units * avg_sqm,
+            "kind": item.get("kind", "sale"),
+            "total_price": num(item.get("total_price")) if item.get("total_price") not in (None, "") else None,
             "source": item.get("source", ""),
         })
 
-    # נכס מניב: שווי היציאה מהוון מה-NOI לפי שיעור התשואה.
+    # ---- נכס מניב ----
+    # שני זרמים נפרדים, ולא אחד: דמי השכירות שנצברים בשנות ההחזקה, ושווי המימוש
+    # המהוון בסופן. גרסה קודמת חישבה רק את המימוש, וכך "נעלמו" שנות ההשכרה —
+    # בפרויקט לוגיסטי טיפוסי אלה עשרות מיליוני ש"ח שנפלו בין הכיסאות.
     income_asset = p.get("income_asset") or {}
     exit_value_gross = 0.0
     noi = num(income_asset.get("annual_noi"))
     cap_rate = pct(income_asset.get("cap_rate"), 0.0)
+    holding_years = num(income_asset.get("holding_years"), 0)
+    asset_sqm = num(income_asset.get("sqm"))
+
+    if noi and holding_years:
+        operating_gross = noi * holding_years * (1.0 + price_delta)
+        revenue_lines.append({
+            "label": "הכנסות שכירות בתקופת ההחזקה (%g שנים)" % holding_years,
+            "units": holding_years,
+            "avg_sqm": asset_sqm,
+            "price_per_sqm": (noi / asset_sqm) if asset_sqm else 0.0,
+            "gross": operating_gross,
+            "net": operating_gross / vat_divisor,
+            # הכנסה תפעולית אינה מכירת שטח. ספירתה כשטח מכיר מנפחת את
+            # "עלות למ"ר מכור" פי מספר שנות ההחזקה והופכת אותו למספר חסר פשר.
+            "sellable_sqm": 0.0,
+            "kind": "operating",
+            "source": income_asset.get("source", "") or "NOI שנתי × שנות החזקה",
+        })
+
     if noi and cap_rate:
         exit_value_gross = (noi / cap_rate) * (1.0 + price_delta)
         revenue_lines.append({
             "label": income_asset.get("label", "מימוש נכס מניב (Exit)"),
             "units": 1,
-            "avg_sqm": num(income_asset.get("sqm")),
-            "price_per_sqm": (exit_value_gross / num(income_asset.get("sqm"), 1)) if num(income_asset.get("sqm")) else 0.0,
+            "avg_sqm": asset_sqm,
+            "price_per_sqm": (exit_value_gross / asset_sqm) if asset_sqm else 0.0,
             "gross": exit_value_gross,
             "net": exit_value_gross / vat_divisor,
-            "sellable_sqm": num(income_asset.get("sqm")),
+            "sellable_sqm": asset_sqm,
+            "kind": "exit",
             "source": "היוון NOI בשיעור %.2f%%" % (cap_rate * 100),
         })
 
@@ -260,8 +285,49 @@ def build_model(project: dict, price_delta: float = 0.0, cost_delta: float = 0.0
             "basis": basis,
             "pct": pct(item.get("pct")),
             "amount": amount,
+            "group": item.get("group", ""),
             "source": item.get("source", ""),
         })
+
+    # ---- עלויות הטיפול בדיירים (התחדשות עירונית) ----
+    # תקן 21 ס' 4.14(ד) מטפל בהן כפרק עצמאי, לא כשורה בתוך העקיפות — וזה נכון
+    # מעשית: זה המספר הראשון שהדיירים, הרשות והשמאי שואלים עליו. הפריטים נכנסים
+    # לחישוב יחד עם שאר העקיפות, אבל נשמרים גם כקבוצה נפרדת עם סכום משלה.
+    tenants = p.get("tenants") or {}
+    tenant_lines = []
+    if tenants:
+        t_units = num(tenants.get("units"))
+        rent = num(tenants.get("rent_per_unit_month")) * num(tenants.get("rent_months")) * t_units
+        if rent:
+            tenant_lines.append({"label": "דמי שכירות לדיירים בתקופת הבנייה",
+                                 "amount": rent, "source": tenants.get("rent_source", "")})
+        for key, label in [("moving_per_unit", "הובלות ואחסון"),
+                           ("legal_per_unit", "ליווי משפטי לדיירים"),
+                           ("consultants_per_unit", "יועצים ומפקח מטעם הדיירים")]:
+            v = num(tenants.get(key)) * t_units
+            if v:
+                tenant_lines.append({"label": "%s (%d יח\"ד)" % (label, int(t_units)),
+                                     "amount": v, "source": tenants.get("source", "")})
+        for key, label in [("organizer", "מארגן וארגון דיירים"),
+                           ("betterment_for_tenants", "מיסוי בגין רכישת זכויות הדיירים"),
+                           ("other", "עלויות דיירים אחרות")]:
+            v = num(tenants.get(key))
+            if v:
+                tenant_lines.append({"label": label, "amount": v,
+                                     "source": tenants.get("source", "")})
+        t_base = sum(l["amount"] for l in tenant_lines)
+        t_cont = pct(tenants.get("contingency_pct"), 0.0) * t_base
+        if t_cont:
+            tenant_lines.append({
+                "label": "בצ\"מ ייעודי לדיירים (סרבנים, הארכת שכירות)",
+                "amount": t_cont,
+                "source": "אחוז מעלויות הדיירים, לפי ההנחות"})
+        for line in tenant_lines:
+            indirect_lines.append({"label": line["label"], "basis": "fixed", "pct": 0.0,
+                                   "amount": line["amount"], "group": "tenants",
+                                   "source": line.get("source", "")})
+
+    tenants_total = sum(l["amount"] for l in tenant_lines)
 
     betterment = num(tax.get("betterment_levy"))
     if betterment:
@@ -382,22 +448,74 @@ def build_model(project: dict, price_delta: float = 0.0, cost_delta: float = 0.0
     roc = profit_after_tax / equity if equity else 0.0
     cost_per_sold_sqm = total_cost / sellable_sqm if sellable_sqm else 0.0
 
-    # IRR על תזרים ההון העצמי: יציאות = הון שהוזרם, כניסה אחרונה = רווח לאחר מס.
+    # IRR על תזרים ההון העצמי: יציאות = הון שהוזרם, כניסה אחרונה = החזר ההון
+    # שהוזרם בפועל בתוספת הרווח לאחר מס.
     equity_flows = [-r["equity_used"] for r in rows]
+    equity_injected = sum(r["equity_used"] for r in rows)
     if equity_flows:
-        equity_flows[-1] += equity + profit_after_tax
+        equity_flows[-1] += equity_injected + profit_after_tax
     irr_annual = _irr(equity_flows)
 
-    threshold = pct((p.get("thresholds") or {}).get("min_profit_on_cost_pct"), 15.0)
+    # IRR לא-ממונף: אותו פרויקט בלי אשראי. מפריד בין "הפרויקט טוב" לבין
+    # "המינוף עשה את העבודה" — הבחנה שמשנה את ההחלטה כשהמרווח דק.
+    unlev = [r["revenue"] - (r["outflow"]) for r in rows]
+    irr_unlevered = _irr(unlev)
+
+    project_years = len(rows) / 4.0
+    roc = profit_after_tax / equity if equity else 0.0
+
+    # ---- מדדי נכס מניב ----
+    # לפרויקט להשכרה השאלה אינה "כמה אחוז רווח" אלא "האם התשואה על העלות
+    # גבוהה מספיק מעל שיעור ההיוון שבו נמכור". מרווח דק הוא הסיכון האמיתי,
+    # והוא בלתי נראה במדד הרווח היזמי.
+    income_metrics = None
+    if noi:
+        yield_on_cost = noi / total_cost if total_cost else 0.0
+        spread_bps = (yield_on_cost - cap_rate) * 10000 if cap_rate else None
+        annual_debt_service = peak_debt * annual_rate
+        income_metrics = {
+            "annual_noi": noi,
+            "holding_years": holding_years,
+            "exit_cap_rate": cap_rate,
+            "exit_value": exit_value_gross,
+            "yield_on_cost": yield_on_cost,
+            "spread_bps": spread_bps,
+            "dscr": (noi / annual_debt_service) if annual_debt_service else None,
+            "ltc": (peak_debt / total_cost) if total_cost else 0.0,
+            "breakeven_cap_rate": (noi / total_cost) if total_cost else None,
+        }
+
+    # ---- סף הבקרה ----
+    # סף הרווח היזמי של 15%–18% הוא נוהג של ייזום למכירה. cost-benchmarks.md
+    # אומר במפורש שהוא לא אומת לנדל"ן מניב, ולכן אין להחיל אותו שם: בפרויקט
+    # מניב המבחן הוא מרווח התשואה, ומדידה לפי הסף הלא נכון נותנת תשובה
+    # בטוחה-למראה ושגויה.
+    thresholds = p.get("thresholds") or {}
+    kind = project_kind(p)
+    if kind == "income":
+        threshold = pct(thresholds.get("min_profit_on_cost_pct"), 0.0)
+        min_spread = num(thresholds.get("min_spread_bps"), 150)
+        threshold_basis = "spread"
+    else:
+        threshold = pct(thresholds.get("min_profit_on_cost_pct"), 15.0)
+        min_spread = None
+        threshold_basis = "margin"
+
+    if kind == "income" and income_metrics and income_metrics["spread_bps"] is not None:
+        meets = income_metrics["spread_bps"] >= min_spread
+    else:
+        meets = margin_on_cost >= threshold
 
     return {
         "meta": p.get("meta", {}),
+        "kind": kind,
         "vat_pct": vat,
         "developer_type": developer_type,
         "profit_tax_rate": profit_tax_rate,
         "land": {"lines": land_lines, "total": land_total},
         "direct": {"lines": direct_lines, "total": direct_total},
         "indirect": {"lines": indirect_lines, "total": indirect_total},
+        "tenants": {"lines": tenant_lines, "total": tenants_total},
         "contingency": {"pct": cont_pct, "base": cont_base, "amount": contingency},
         "finance": {
             "lines": finance_lines, "total": finance_total,
@@ -421,13 +539,47 @@ def build_model(project: dict, price_delta: float = 0.0, cost_delta: float = 0.0
             "margin_on_cost": margin_on_cost,
             "margin_on_revenue": margin_on_revenue,
             "irr_annual": irr_annual,
+            "irr_unlevered": irr_unlevered,
+            # תשואה מצטברת על פני חיי הפרויקט, לא שנתית. התווית חשובה: 15%
+            # על פני חמש שנים ו-15% בשנה הם שני דברים שונים לגמרי.
             "roc": roc,
+            "project_years": project_years,
             "cost_per_sold_sqm": cost_per_sold_sqm,
             "peak_debt": peak_debt,
+            "equity_injected": equity_injected,
             "profit_threshold": threshold,
-            "meets_threshold": margin_on_cost >= threshold,
+            "min_spread_bps": min_spread,
+            # לפי מה נמדדת ההצלחה: "margin" = רווח יזמי כאחוז מהעלויות
+            # (ייזום למכירה), "spread" = מרווח התשואה מול ההיוון (נכס מניב).
+            # הבונים קוראים את זה כדי לא לכתוב "מתחת לסף 15%" על פרויקט מניב.
+            "threshold_basis": threshold_basis,
+            "meets_threshold": meets,
         },
+        "income_metrics": income_metrics,
     }
+
+
+def project_kind(project):
+    """מסווג את **כלכלת** הפרויקט. אל תבלבל בין זה לבין ``meta.mode``.
+
+    ``kind`` נגזר מהנתונים וקובע כיצד הפרויקט נמדד:
+      ``income``  — נכס מניב. המבחן הוא מרווח התשואה מול ההיוון, לא רווח יזמי.
+      ``renewal`` — התחדשות עירונית: יש דיירים ודירות תמורה.
+      ``sale``    — ייזום למכירה. המבחן הוא הרווח היזמי כאחוז מהעלויות.
+
+    ``meta.mode`` הוא עניין אחר לגמרי — **מבנה הדוח** (``takan21`` / ``full`` /
+    ``short``). גרסה קודמת גזרה kind מ-mode, וכך פרויקט מגורים רגיל שהוגש
+    במבנה המלא סווג בטעות כהתחדשות עירונית. יזם יכול לרצות דוח מפורט בלי
+    שיהיו בפרויקט דיירים.
+    """
+    explicit = ((project.get("meta") or {}).get("kind") or "").strip()
+    if explicit in ("income", "renewal", "sale"):
+        return explicit
+    if project.get("income_asset"):
+        return "income"
+    if project.get("tenants"):
+        return "renewal"
+    return "sale"
 
 
 def _irr(flows, lo=-0.95, hi=10.0, tol=1e-7, iters=200):
@@ -481,6 +633,50 @@ def sensitivity_grid(project, price_steps=None, cost_steps=None, metric="margin_
     return {"price_steps": [num(s) for s in price_steps],
             "cost_steps": [num(s) for s in cost_steps],
             "metric": metric, "grid": grid}
+
+
+def break_even(project):
+    """מוצא את נקודות המפנה: איפה הרווח מתאפס ואיפה הוא פוגש את הסף.
+
+    תקן 21 ס' 4.15 מחייב את זה, אבל התועלת רחבה יותר — ליזם, "עד כמה המחיר
+    יכול לרדת לפני שאני מפסיד" הוא מספר שימושי הרבה יותר מאחוז רווח בודד.
+    נפתר בחיפוש בינארי על סטיית המחיר, כי הרווח מונוטוני עולה בה.
+    """
+    base = build_model(project)
+    th = base["results"]["profit_threshold"]
+
+    def solve(target):
+        lo, hi = -0.95, 3.0
+        f = lambda d: build_model(project, price_delta=d)["results"]["margin_on_cost"] - target
+        if f(lo) > 0:
+            return lo
+        if f(hi) < 0:
+            return None
+        for _ in range(60):
+            mid = (lo + hi) / 2
+            if f(mid) < 0:
+                lo = mid
+            else:
+                hi = mid
+        return (lo + hi) / 2
+
+    def price_at(delta):
+        if delta is None:
+            return None
+        items = (project.get("revenue") or {}).get("items") or []
+        if not items:
+            return None
+        return num(items[0].get("price_per_sqm")) * (1 + delta)
+
+    zero_d = solve(0.0)
+    th_d = solve(th) if th else None
+    return {
+        "zero_profit_price_delta": zero_d,
+        "zero_profit_price_per_sqm": price_at(zero_d),
+        "threshold_price_delta": th_d,
+        "threshold_price_per_sqm": price_at(th_d),
+        "threshold": th,
+    }
 
 
 def rate_scenarios(project, steps_pp=None, metric="margin_on_cost"):
@@ -594,6 +790,19 @@ def derive_flags(project, model):
 # ---------------------------------------------------------------------------
 
 
+def _fmt_val(v):
+    """מעצב ערך להערת סטייה. עיגול לשלם הפך שיעור של 6.75% ל-"7" ואת האסמכתה
+    5.2% ל-"5", כך שההערה דיווחה על פער שאינו קיים. ערך קטן מ-100 הוא כמעט
+    תמיד שיעור אחוז ולא סכום, ולכן נשמרות לו שתי ספרות."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    if abs(f) < 100:
+        return ("%.2f" % f).rstrip("0").rstrip(".")
+    return format(int(round(f)), ",")
+
+
 def deviation_notes(project, tolerance=0.10):
     """מסמן קלטי משתמש שסוטים מעל הסף מהאסמכתה החיצונית שנמצאה.
 
@@ -617,7 +826,7 @@ def deviation_notes(project, tolerance=0.10):
                 "source_date": bm.get("source_date", ""),
                 "text": "%s: הוזן %s מול אסמכתה %s (%s%.0f%%). מקור: %s%s" % (
                     bm.get("label", ""),
-                    format(round(used), ","), format(round(ref), ","),
+                    _fmt_val(used), _fmt_val(ref),
                     "+" if dev > 0 else "", dev * 100,
                     bm.get("source", "לא צוין"),
                     (", " + bm["source_date"]) if bm.get("source_date") else "",
@@ -636,6 +845,7 @@ def full_output(project):
     return {
         "project": project,
         "model": model,
+        "break_even": break_even(project),
         "sensitivity": sensitivity_grid(project),
         "sensitivity_profit": sensitivity_grid(project, metric="profit_before_tax"),
         "rate_scenarios": rate_scenarios(project),

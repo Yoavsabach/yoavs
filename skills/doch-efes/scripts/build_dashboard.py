@@ -267,6 +267,7 @@ def build_html(data):
     r = m["results"]
     meta = m["meta"]
     ok = r["meets_threshold"]
+    kind = m.get("kind", "sale")
     reds = [f for f in data["flags"] if f.get("level") == "red"]
 
     # --- כותרת ומסקנה ---
@@ -276,9 +277,16 @@ def build_html(data):
         vcls, vtext = "warn", "הפרויקט עומד בסף — אך אותרו דגלים אדומים"
     else:
         vcls, vtext = "fail", "הפרויקט אינו עומד בסף הכדאיות"
-    vsub = ("רווח יזמי %s, המהווה %s מהעלויות. הסף שהוגדר: %s."
-            % (full_money(r["profit_before_tax"]), percent(r["margin_on_cost"]),
-               percent(r["profit_threshold"], 0)))
+    if r.get("threshold_basis") == "spread":
+        im = m.get("income_metrics") or {}
+        vsub = ("תשואה על העלות %s מול שיעור היוון ביציאה %s — מרווח %d נק' בסיס "
+                "(נורמה: 150–200). רווח %s."
+                % (percent(im.get("yield_on_cost"), 2), percent(im.get("exit_cap_rate"), 2),
+                   round(im.get("spread_bps") or 0), full_money(r["profit_before_tax"])))
+    else:
+        vsub = ("רווח יזמי %s, המהווה %s מהעלויות. הסף שהוגדר: %s."
+                % (full_money(r["profit_before_tax"]), percent(r["margin_on_cost"]),
+                   percent(r["profit_threshold"], 0)))
 
     kpis = [
         ("רווח יזמי", full_money(r["profit_before_tax"]),
@@ -288,7 +296,8 @@ def build_html(data):
         ("IRR שנתי", percent(r["irr_annual"]) if r["irr_annual"] is not None else "—",
          "על ההון העצמי", "info"),
         ("סך עלויות", full_money(r["total_cost"]),
-         "%s למ\"ר מכור" % full_money(r["cost_per_sold_sqm"]), ""),
+         "%s למ\"ר %s" % (full_money(r["cost_per_sold_sqm"]),
+                          "בנוי" if kind == "income" else "מכור"), ""),
         ("סך הכנסות", full_money(r["total_revenue_net"]),
          "נטו ממע\"מ · ברוטו %s" % money(r["total_revenue_gross"]), ""),
     ]

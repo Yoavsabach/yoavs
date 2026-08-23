@@ -76,6 +76,7 @@ class Deck:
     def __init__(self, data):
         self.d = data
         self.m = data["model"]
+        self.kind = data["model"].get("kind", "sale")
         self.prs = Presentation()
         self.prs.slide_width, self.prs.slide_height = W, H
         self.blank = self.prs.slide_layouts[6]
@@ -265,7 +266,9 @@ class Deck:
         sources = [
             ["הון עצמי", money(m["finance"]["equity"], short=True)],
             ["אשראי ליווי (שיא)", money(m["results"]["peak_debt"], short=True)],
-            ["הכנסות ממכירות (נטו)", money(m["results"]["total_revenue_net"], short=True)],
+            ["הכנסות מהשכרה ומימוש (נטו)" if self.kind == "income"
+             else "הכנסות ממכירות (נטו)",
+             money(m["results"]["total_revenue_net"], short=True)],
         ]
         self.text(s, "שימושים", Inches(1.7), size=18, bold=True, color=NAVY,
                   left=int(W / 2) + Inches(0.2), width=int(W / 2) - Inches(0.8))
@@ -316,7 +319,8 @@ class Deck:
             ("רווח יזמי", money(r["profit_before_tax"], short=True), GREEN if ok else RED),
             ("% מהעלויות", percent(r["margin_on_cost"]), GREEN if ok else RED),
             ("IRR שנתי", percent(r["irr_annual"]) if r["irr_annual"] is not None else "—", NAVY),
-            ("עלות למ\"ר מכור", money(r["cost_per_sold_sqm"]), NAVY),
+            ("עלות למ\"ר בנוי" if self.kind == "income" else "עלות למ\"ר מכור",
+             money(r["cost_per_sold_sqm"]), NAVY),
         ], top=Inches(1.7))
         self.table(s, ["מדד", "סכום"], [
             ["סך הכנסות (נטו ממע\"מ)", money(r["total_revenue_net"])],
@@ -402,6 +406,14 @@ class Deck:
                     "שיש להסיר לפני החלטת השקעה: %s."
                     % (percent(r["margin_on_cost"]), len(reds),
                        "; ".join(f["title"] for f in reds)))
+        elif r.get("threshold_basis") == "spread":
+            im = self.m.get("income_metrics") or {}
+            headline, color = "הפרויקט אינו עומד במבחן המרווח", RED
+            body = ("התשואה על העלות %s מול שיעור היוון ביציאה %s — מרווח של %d נקודות "
+                    "בסיס בלבד, מול נורמה של 150–200. הנכס שווה כמעט בדיוק את עלות "
+                    "הקמתו, ותנודה קטנה בשכירות או בהיוון מוחקת את הרווח."
+                    % (percent(im.get("yield_on_cost"), 2), percent(im.get("exit_cap_rate"), 2),
+                       round(im.get("spread_bps") or 0)))
         else:
             headline, color = "הפרויקט אינו עומד בסף הכדאיות", RED
             body = ("הרווח היזמי %s מהעלויות, מתחת לסף %s. נדרש שינוי מהותי — מחיר "
@@ -410,11 +422,13 @@ class Deck:
         self.text(s, headline, Inches(2.0), size=30, bold=True, color=color)
         self.text(s, body, Inches(3.0), size=17)
         self.text(s, "הצעדים הבאים:", Inches(4.3), size=17, bold=True, color=NAVY)
-        self.bullets(s, [
-            "אימות מחירי המכירה מול עסקאות השוואה עדכניות באזור.",
-            "קבלת אומדן היטל השבחה מהוועדה המקומית.",
-            "בחינת תנאי הליווי מול הבנק המלווה.",
-        ], Inches(4.9), size=15)
+        steps = ["אימות דמי השכירות ושיעור ההיוון מול עסקאות השוואה לנכסים דומים.",
+                 "בחינת חוזה עוגן — הוא מרחיב את שיעור הליווי ומוזיל את ההון הנדרש.",
+                 "אימות זכויות הבנייה בתב\"ע מול השטח הבנוי המתוכנן."] if self.kind == "income" else [
+                 "אימות מחירי המכירה מול עסקאות השוואה עדכניות באזור.",
+                 "קבלת אומדן היטל השבחה מהוועדה המקומית.",
+                 "בחינת תנאי הליווי מול הבנק המלווה."]
+        self.bullets(s, steps, Inches(4.9), size=15)
         self.footer(s)
 
     def build(self, path):

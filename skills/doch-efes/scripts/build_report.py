@@ -114,6 +114,9 @@ class Report:
         self.d = data
         self.m = data["model"]
         self.mode = mode
+        self.kind = data["model"].get("kind", "sale")
+        self._ch = 0
+        self._sub = 0
         self.doc = Document()
         self._setup()
 
@@ -131,6 +134,18 @@ class Report:
             qn('w:ascii'): FONT, qn('w:hAnsi'): FONT, qn('w:cs'): FONT}))
 
     # -- אבני בניין --------------------------------------------------------
+
+    def chapter(self, text):
+        """כותרת פרק ממוספרת. המספר נגזר ממונה רץ ולא נכתב בכותרת עצמה —
+        גרסה קודמת קידדה אותו קשיח, וכשמצב מקוצר דילג על פרקים יצא דוח
+        שממוספר 3, 5, 7, 9. מסמך שמוגש ליזם או לבנק לא יכול להיראות כך."""
+        self._ch += 1
+        self._sub = 0
+        return self.h("%d. %s" % (self._ch, text), 1)
+
+    def sub(self, text):
+        self._sub += 1
+        return self.h("%d.%d %s" % (self._ch, self._sub, text), 2)
 
     def h(self, text, level=1):
         sizes = {0: 20, 1: 15, 2: 13, 3: 12}
@@ -241,7 +256,7 @@ class Report:
                 ["רווח יזמי — % מההכנסות", percent(r["margin_on_revenue"])],
                 ["IRR שנתי על ההון העצמי",
                  percent(r["irr_annual"]) if r["irr_annual"] is not None else "לא ניתן לחישוב"],
-                ["עלות למ\"ר מכור", money(r["cost_per_sold_sqm"])],
+                [self._sqm_label(), money(r["cost_per_sold_sqm"])],
                 ["שיא ניצול אשראי ליווי", money(r["peak_debt"])],
             ], widths=[90, 60])
 
@@ -270,7 +285,7 @@ class Report:
 
     def identification(self):
         meta = self.m["meta"]
-        self.h("1. זיהוי המקרקעין ומטרת הדוח", 1)
+        self.chapter("זיהוי המקרקעין ומטרת הדוח")
         self.para("מטרת הדוח היא בחינת הכדאיות הכלכלית של הפרויקט עבור היזם, לצורך "
                   "קבלת החלטת השקעה ובחינת התכנות מול גורם מממן.")
         rows = [[label, meta.get(key, "—") or "—"] for label, key in
@@ -280,7 +295,7 @@ class Report:
         self.table(["פרט", "תוכן"], rows, widths=[55, 95])
 
     def planning(self):
-        self.h("2. המצב התכנוני וזכויות הבנייה", 1)
+        self.chapter("המצב התכנוני וזכויות הבנייה")
         meta = self.m["meta"]
         if meta.get("plan"):
             self.para("המצב התכנוני החל על המקרקעין: %s." % meta["plan"])
@@ -295,13 +310,13 @@ class Report:
                   "בפני שמאי מכריע.")
 
     def costs(self):
-        self.h("3. אומדן העלויות", 1)
-        self.h("3.1 קרקע ורכישה", 2)
+        self.chapter("אומדן העלויות")
+        self.sub("קרקע ורכישה")
         self.table(["סעיף", "סכום"],
                    [[l["label"], money(l["amount"])] for l in self.m["land"]["lines"]] +
                    [["סה\"כ קרקע ורכישה", money(self.m["land"]["total"])]], widths=[95, 55])
 
-        self.h("3.2 עלויות בנייה ישירות", 2)
+        self.sub("עלויות בנייה ישירות")
         self.table(["רכיב", "שטח / כמות", "עלות ליחידה", "סה\"כ"],
                    [[l["label"], format(round(l["sqm"]), ","),
                      money(l["cost_per_sqm"]) if l["cost_per_sqm"] else "—",
@@ -309,21 +324,39 @@ class Report:
                    [["סה\"כ עלויות ישירות", "", "", money(self.m["direct"]["total"])]],
                    widths=[52, 28, 32, 38])
 
-        self.h("3.3 עלויות עקיפות", 2)
+        self.sub("עלויות עקיפות")
         self.table(["סעיף", "שיעור", "סכום"],
                    [[l["label"], percent(l["pct"]) if l["pct"] else "—", money(l["amount"])]
                     for l in self.m["indirect"]["lines"]] +
                    [["סה\"כ עלויות עקיפות", "", money(self.m["indirect"]["total"])]],
                    widths=[80, 30, 40])
 
-        self.h("3.4 בלתי צפוי מראש (בצ\"מ)", 2)
+        self.sub("בלתי צפוי מראש (בצ\"מ)")
         c = self.m["contingency"]
         self.para("בצ\"מ נקבע בשיעור %s מבסיס של %s, ובסך %s. הטווח המקובל בליווי "
                   "בנקאי הוא 5%%–10%%; שיעור נמוך מכך נבחן על ידי הבנק המלווה."
                   % (percent(c["pct"]), money(c["base"]), money(c["amount"])))
 
+    def tenant_costs(self):
+        """תקן 21 ס' 4.14(ד) מטפל בעלויות הדיירים כפרק עצמאי, ובצדק: זה המספר
+        הראשון שהדיירים, הרשות והשמאי שואלים עליו. פיזור השורות בתוך העקיפות
+        מסתיר בדיוק את מה שצריך להיות גלוי."""
+        t = self.m.get("tenants") or {}
+        if not t.get("lines"):
+            return
+        self.chapter("עלויות הטיפול בדיירים")
+        self.para("בפרויקט התחדשות עירונית העלויות הכרוכות בטיפול בדיירים הן מרכיב "
+                  "עצמאי, ולא סעיף משנה בעלויות העקיפות. להלן פירוטן:")
+        self.table(["סעיף", "סכום", "מקור"],
+                   [[l["label"], money(l["amount"]), l.get("source") or "—"]
+                    for l in t["lines"]] +
+                   [["סה\"כ עלויות הטיפול בדיירים", money(t["total"]), ""]],
+                   widths=[70, 45, 35])
+        share = t["total"] / self.m["results"]["total_cost"] if self.m["results"]["total_cost"] else 0
+        self.para("עלויות הטיפול בדיירים מהוות %s מסך עלויות הפרויקט." % percent(share))
+
     def finance(self):
-        self.h("4. מבנה המימון", 1)
+        self.chapter("מבנה המימון")
         f = self.m["finance"]
         self.para("מקורות המימון: הון עצמי בסך %s ואשראי ליווי. שיא ניצול האשראי לאורך "
                   "חיי הפרויקט עומד על %s, וזו מסגרת האשראי הנדרשת. הריבית חושבה "
@@ -334,11 +367,12 @@ class Report:
                    [["סה\"כ עלויות מימון", money(f["total"])]], widths=[95, 55])
 
     def revenue(self):
-        self.h("5. אומדן ההכנסות", 1)
+        self.chapter("אומדן ההכנסות")
         rev = self.m["revenue"]
-        self.para("מחירי המכירה הוזנו %s מע\"מ. הרווח היזמי נמדד על ההכנסה נטו, שכן "
-                  "המע\"מ מועבר לרשות המסים ואינו מהווה הכנסה של היזם."
-                  % ("כוללי" if rev["prices_include_vat"] else "ללא"))
+        word = "המחירים" if self.kind == "income" else "מחירי המכירה"
+        self.para("%s הוזנו %s מע\"מ. הרווח נמדד על ההכנסה נטו, שכן המע\"מ מועבר "
+                  "לרשות המסים ואינו מהווה הכנסה של היזם."
+                  % (word, "כוללי" if rev["prices_include_vat"] else "ללא"))
         self.table(["רכיב", "יחידות", "שטח ממוצע", "מחיר למ\"ר", "סה\"כ ברוטו", "נטו"],
                    [[l["label"], format(int(l["units"]), ","),
                      format(round(l["avg_sqm"]), ","), money(l["price_per_sqm"]),
@@ -347,7 +381,7 @@ class Report:
                    widths=[36, 18, 22, 26, 26, 26])
 
     def cashflow(self):
-        self.h("6. תזרים המזומנים", 1)
+        self.chapter("תזרים המזומנים")
         self.para("התזרים נפרס על פני %d רבעונים. ההון העצמי נספג ראשון, והריבית נצברת "
                   "על היתרה שמעבר לו בלבד." % len(self.m["cashflow"]))
         rows = [[r["quarter"], money(r["outflow"]), money(r["revenue"]),
@@ -357,7 +391,7 @@ class Report:
                    widths=[24, 32, 32, 28, 34])
 
     def results(self):
-        self.h("7. תוצאות המודל", 1)
+        self.chapter("תוצאות המודל")
         r = self.m["results"]
         self.table(["מדד", "תוצאה"], [
             ["סך עלויות הפרויקט", money(r["total_cost"])],
@@ -368,12 +402,61 @@ class Report:
             ["מס על הרווח", money(r["profit_tax"])],
             ["רווח לאחר מס", money(r["profit_after_tax"])],
             ["IRR שנתי", percent(r["irr_annual"]) if r["irr_annual"] is not None else "לא ניתן לחישוב"],
-            ["תשואה על ההון (ROC)", percent(r["roc"])],
-            ["עלות למ\"ר מכור", money(r["cost_per_sold_sqm"])],
+            ["תשואה מצטברת על ההון (על פני %.1f שנים)" % r["project_years"],
+             percent(r["roc"])],
+            [self._sqm_label(), money(r["cost_per_sold_sqm"])],
         ], widths=[90, 60])
 
+    def income_asset_metrics(self):
+        """בפרויקט מניב הרווח היזמי הוא לא המבחן. המבחן הוא המרווח בין התשואה
+        על העלות לשיעור ההיוון שבו הנכס יימכר — מרווח דק שורף את הפרויקט גם
+        כשמדד הרווח נראה חיובי."""
+        im = self.m.get("income_metrics")
+        if not im:
+            return
+        self.chapter("מדדי הנכס המניב")
+        spread = im.get("spread_bps")
+        self.table(["מדד", "ערך", "משמעות"], [
+            ["NOI שנתי", money(im["annual_noi"]), "הכנסה תפעולית נקייה"],
+            ["תשואה על העלות (Yield on Cost)", percent(im["yield_on_cost"], 2),
+             "NOI חלקי סך עלות הפרויקט"],
+            ["שיעור היוון ביציאה (Exit Cap)", percent(im["exit_cap_rate"], 2),
+             "השיעור שבו מהוון שווי המימוש"],
+            ["מרווח", "%s נק' בסיס" % (round(spread) if spread is not None else "—"),
+             "הנורמה בייזום מניב היא 150–200 נק'"],
+            ["שיעור היוון לאיזון", percent(im["breakeven_cap_rate"], 2),
+             "מעליו הפרויקט מפסיד"],
+            ["DSCR", ("%.2f" % im["dscr"]) if im.get("dscr") else "—",
+             "יחס כיסוי שירות החוב"],
+            ["LTC", percent(im["ltc"]), "שיעור החוב מסך העלות"],
+        ], widths=[52, 38, 60])
+        if spread is not None and spread < 150:
+            self.para("המרווח של %d נקודות בסיס צר מהנורמה. בפרויקט מניב זהו "
+                      "הסיכון המהותי: הנכס שווה כמעט בדיוק את עלות הקמתו, "
+                      "ותנודה קטנה בשיעור ההיוון או בדמי השכירות מוחקת את הרווח."
+                      % round(spread), bold=True)
+
+    def break_even_chapter(self):
+        """תקן 21 ס' 4.15 מחייב נקודת איזון. גם מחוץ לתקן זה המספר שהיזם
+        באמת רוצה: כמה המחיר יכול לרדת לפני שהעסקה מפסידה."""
+        be = self.d.get("break_even") or {}
+        if be.get("zero_profit_price_per_sqm") is None:
+            return
+        self.chapter("נקודות איזון")
+        rows = [["מחיר מכירה לאיזון (רווח אפס)",
+                 money(be["zero_profit_price_per_sqm"]),
+                 "%s ממחיר הבסיס" % percent(be["zero_profit_price_delta"])]]
+        if be.get("threshold_price_per_sqm"):
+            rows.append(["מחיר מכירה לעמידה בסף %s" % percent(be["threshold"], 0),
+                         money(be["threshold_price_per_sqm"]),
+                         "%s ממחיר הבסיס" % percent(be["threshold_price_delta"])])
+        self.table(["מדד", "מחיר למ\"ר", "פער ממחיר הבסיס"], rows, widths=[65, 40, 45])
+
+    def _sqm_label(self):
+        return "עלות למ\"ר בנוי" if self.kind == "income" else "עלות למ\"ר מכור"
+
     def sensitivity(self):
-        self.h("8. ניתוחי רגישות", 1)
+        self.chapter("ניתוחי רגישות")
         s = self.d["sensitivity"]
         self.para("הטבלה מציגה את הרווח היזמי כאחוז מהעלויות בשילובים של שינוי במחיר "
                   "המכירה ובעלות הבנייה. תא שלילי או נמוך מהסף מסמן תרחיש שבו הפרויקט "
@@ -383,14 +466,14 @@ class Report:
                 for i, row in enumerate(s["grid"])]
         self.table(headers, rows)
 
-        self.h("8.1 תרחישי ריבית", 2)
+        self.sub("תרחישי ריבית")
         self.table(["שינוי בריבית", "ריבית שנתית", "עלות ריבית", "רווח יזמי", "% מהעלויות"],
                    [["%+.1f נק' אחוז" % sc["delta_pp"], percent(sc["rate"]),
                      money(sc["interest"]), money(sc["profit"]), percent(sc["metric"])]
                     for sc in self.d["rate_scenarios"]])
 
     def flags(self):
-        self.h("9. דגלים ונקודות לבחינה", 1)
+        self.chapter("דגלים ונקודות לבחינה")
         flags = self.d["flags"]
         if not flags:
             self.para("המודל לא זיהה חריגה מהספים שהוגדרו. אין בכך משום אישור לפרויקט — "
@@ -400,17 +483,17 @@ class Report:
             self.para(f.get("text", ""))
         devs = self.d["deviations"]
         if devs:
-            self.h("9.1 סטיות מאסמכתאות חיצוניות", 2)
+            self.sub("סטיות מאסמכתאות חיצוניות")
             self.para("הקלטים הבאים סוטים ביותר מ-10%% מהאסמכתה החיצונית שאותרה. הקלט "
                       "לא שונה — ההחלטה על המספר היא של היזם — אך הפער מדווח במפורש:")
             self.bullets([d["text"] for d in devs])
 
     def methodology(self):
-        self.h("10. מתודולוגיה, מקורות ומגבלות", 1)
+        self.chapter("מתודולוגיה, מקורות ומגבלות")
         self.para("המודל נבנה כמודל תזרימי רבעוני. העלויות והכנסות נפרסות על ציר הזמן, "
                   "עלות המימון מחושבת על היתרה המנוצלת בפועל בכל רבעון, והרווח היזמי "
                   "נמדד הן כאחוז מהעלויות והן כאחוז מההכנסות.")
-        self.h("10.1 מקורות הנתונים", 2)
+        self.sub("מקורות הנתונים")
         sources = []
         for group in ("land", "direct", "indirect"):
             for line in self.m[group]["lines"]:
@@ -420,7 +503,13 @@ class Report:
             if line.get("source"):
                 sources.append("%s — %s" % (line["label"], line["source"]))
         self.bullets(sources or ["לא צוינו מקורות פרטניים בקלט. יש להשלים לפני הצגה לגורם מממן."])
-        self.h("10.2 מגבלות", 2)
+        notes = self.d["project"].get("assumptions_notes") or []
+        if notes:
+            self.sub("הנחות איכותניות")
+            self.table(["נושא", "הנחה", "מקור"],
+                       [[n.get("label", ""), n.get("value", ""), n.get("source") or "—"]
+                        for n in notes], widths=[40, 70, 40])
+        self.sub("מגבלות")
         self.bullets([
             "הדוח מבוסס על נתונים שנמסרו על ידי המזמין ועל אסמכתאות חיצוניות שאותרו במועד עריכתו.",
             "אומדני היטל השבחה ודמי היתר הם אומדנים; הקביעה המחייבת היא של הוועדה המקומית או רמ\"י.",
@@ -433,14 +522,49 @@ class Report:
 
     # -- הרכבה -------------------------------------------------------------
 
+    def takan21_frame(self):
+        """מסגרת חלק א' של תקן 21, לפי מבנה הסעיפים 4.1–4.15 שאומת מול נוסח
+        התקן הרשמי (references/takan-21.md §5.1).
+
+        מה שהסקיל יכול למלא מהמודל — ממולא. מה שהוא לא יכול (מועד הביקור,
+        זהות המבקר, המצב המשפטי) מופיע ככותרת עם דרישת השלמה מפורשת, ולא
+        מושמט. השמטה שקטה יוצרת דוח שנראה שלם ואינו עומד בתקן; כותרת ריקה
+        מסומנת אומרת לעורך בדיוק מה חסר לפני הגשה.
+        """
+        self.chapter("פרטי השומה (תקן 21, ס' 4.1–4.7)")
+        meta = self.m["meta"]
+        need = "— להשלמה בידי עורך השומה"
+        self.table(["ס'", "פרט", "תוכן"], [
+            ["4.1", "סוג השומה", "בדיקה שמאית כלכלית לתכנית פינוי-בינוי"],
+            ["4.2", "זהות מזמין השומה", meta.get("client") or need],
+            ["4.3", "יוזם התכנית", meta.get("client") or need],
+            ["4.4", "מטרת השומה", "בחינת הכדאיות הכלכלית של התכנית המוצעת"],
+            ["4.5", "המועד הקובע", meta.get("date") or need],
+            ["4.6", "מועד הביקור במתחם וזהות המבקר", need],
+            ["4.7", "פרטי זיהוי המתחם",
+             " / ".join(str(meta.get(k, "")) for k in ("gush", "helka", "migrash")) or need],
+        ], widths=[14, 52, 84])
+        self.para("סעיפים 4.6 ו-4.11 מחייבים ביקור בפועל ובדיקת זכויות, ואינם "
+                  "ניתנים לגזירה מהמודל הכלכלי. יש להשלימם בטרם הגשה.", bold=True)
+
     def build(self, path):
         self.cover()
         self.executive_summary()
+        if self.mode == "takan21":
+            self.takan21_frame()
         if self.mode == "short":
-            # הגרסה היזמית המקוצרת: מה שצריך להחלטת Go/No-Go, בלי מנגנון התקן.
+            # הגרסה היזמית המקוצרת מוותרת על פרקי הזיהוי והמצב התכנוני — אבל
+            # **לא** על המימון והתזרים. גרסה קודמת השמיטה גם אותם, ובפרויקטים
+            # ארוכים הריבית היא הסיפור כולו; דוח שמשמיט אותה עונה על השאלה
+            # הלא נכונה.
             self.costs()
+            self.tenant_costs()
+            self.finance()
             self.revenue()
+            self.cashflow()
             self.results()
+            self.income_asset_metrics()
+            self.break_even_chapter()
             self.sensitivity()
             self.flags()
             self.methodology()
@@ -448,10 +572,13 @@ class Report:
             self.identification()
             self.planning()
             self.costs()
+            self.tenant_costs()
             self.finance()
             self.revenue()
             self.cashflow()
             self.results()
+            self.income_asset_metrics()
+            self.break_even_chapter()
             self.sensitivity()
             self.flags()
             self.methodology()
@@ -463,11 +590,13 @@ def main():
     ap = argparse.ArgumentParser(description="בונה את הדוח הנרטיבי כקובץ Word")
     ap.add_argument("project")
     ap.add_argument("-o", "--output", default="דוח אפס.docx")
-    ap.add_argument("--mode", choices=["takan21", "short"], default=None,
-                    help="ברירת מחדל: לפי meta.mode שב-project.json")
+    ap.add_argument("--mode", choices=["takan21", "full", "short"], default=None,
+                    help="מבנה הדוח. takan21 = מסגרת התקן לפינוי-בינוי; "
+                         "full = כל הפרקים; short = יזמי מקוצר. "
+                         "ברירת מחדל: לפי meta.mode שב-project.json")
     args = ap.parse_args()
     project = load_project(args.project)
-    mode = args.mode or (project.get("meta", {}) or {}).get("mode") or "takan21"
+    mode = args.mode or (project.get("meta", {}) or {}).get("mode") or "full"
     data = full_output(project)
     path = Report(data, mode=mode).build(args.output)
     print("נוצר: %s  (מצב: %s)" % (path, mode))

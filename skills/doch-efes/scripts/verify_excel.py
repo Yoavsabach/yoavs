@@ -40,7 +40,8 @@ CHECKS = [
     ("רווח לאחר מס", "profit_after_tax", 1.0),
     ("IRR שנתי על ההון העצמי", "irr_annual", 0.005),
     ("תשואה על ההון (ROC)", "roc", 0.005),
-    ("עלות למ\"ר מכור", "cost_per_sold_sqm", 1.0),
+    # שתי תוויות חלופיות: "מכור" בייזום למכירה, "בנוי" בנכס מניב.
+    (("עלות למ\"ר מכור", "עלות למ\"ר בנוי"), "cost_per_sold_sqm", 1.0),
     ("שיא ניצול אשראי", "peak_debt", 1.0),
 ]
 
@@ -92,9 +93,11 @@ def main():
     print("%-34s %18s %18s" % ("מדד", "אקסל", "מודל"))
     print("-" * 74)
     for label, model_key, tol in CHECKS:
-        row = labels.get(label)
+        options = label if isinstance(label, tuple) else (label,)
+        row = next((labels[o] for o in options if o in labels), None)
+        label = next((o for o in options if o in labels), options[0])
         if row is None:
-            failures.append("לא נמצאה השורה '%s' בגיליון התוצאות" % label)
+            failures.append("לא נמצאה השורה '%s' בגיליון התוצאות" % " / ".join(options))
             continue
         got = cells.get("תוצאות!B%s" % row)
         want = expected.get(model_key)
