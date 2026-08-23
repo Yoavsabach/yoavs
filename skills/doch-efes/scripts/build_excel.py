@@ -85,6 +85,19 @@ class Builder:
 
     # -- עזרי כתיבה --------------------------------------------------------
 
+    @staticmethod
+    def _sum(col, first, last):
+        """סכום עמודה עם הגנה מפני טווח הפוך/ריק.
+
+        כשסקציה יוצאת בלי שורות נתונים (למשל 'עלויות עקיפות' בפרויקט יזמי
+        מקוצר) מתקבל ``first > last`` והנוסחה הנאיבית ``=SUM(D4:D3)`` היא טווח
+        הפוך — חלק ממנועי הגיליון מחזירים עליה ``#NULL!`` שמזהם את כל התזרים
+        במורד הזרם. במקרה כזה מחזירים 0 מספרי חד-משמעי במקום טווח (לא המחרוזת
+        "0" שהייתה נכתבת כתא טקסט ולא כמספר)."""
+        if last < first:
+            return 0
+        return "=SUM(%s%d:%s%d)" % (col, first, col, last)
+
     def sheet(self, title, widths):
         ws = self.wb.create_sheet(title)
         ws.sheet_view.rightToLeft = True   # כל גיליון RTL — לא רק הראשון
@@ -295,7 +308,7 @@ class Builder:
         first = r
         for label, formula, basis in rows:
             r = self.line(ws, r, [label, formula, basis, ""], fmts=[None, NIS0, None, None])
-        r = self.line(ws, r, ["סה\"כ עלות קרקע ורכישה", "=SUM(B%d:B%d)" % (first, r - 1), "", ""],
+        r = self.line(ws, r, ["סה\"כ עלות קרקע ורכישה", self._sum("B", first, r - 1), "", ""],
                       fmts=[None, NIS0, None, None], bold=True, fill=TOT_FILL)
         self.ref["TOTAL_LAND"] = "'קרקע ורכישה'!$B$%d" % (r - 1)
         self.note(ws, r + 1,
@@ -336,7 +349,7 @@ class Builder:
                 extra.get("source", ""),
             ], fmts=[None, None, None, NIS0, None])
 
-        r = self.line(ws, r, ["סה\"כ עלויות בנייה ישירות", "", "", "=SUM(D%d:D%d)" % (first, r - 1), ""],
+        r = self.line(ws, r, ["סה\"כ עלויות בנייה ישירות", "", "", self._sum("D", first, r - 1), ""],
                       fmts=[None, None, None, NIS0, None], bold=True, fill=TOT_FILL)
         self.ref["TOTAL_DIRECT"] = "'עלויות בנייה ישירות'!$D$%d" % (r - 1)
         return ws
@@ -388,7 +401,7 @@ class Builder:
                                       "תקן 21 ס' 4.14(ה)"],
                               fmts=[None, None, None, NIS0, None])
             r = self.line(ws, r, ["מזה — סה\"כ עלויות הטיפול בדיירים", "", "",
-                                  "=SUM(D%d:D%d)" % (t_first, r - 1), ""],
+                                  self._sum("D", t_first, r - 1), ""],
                           fmts=[None, None, None, NIS0, None], bold=True, fill=SUB_FILL)
             # שורת הסיכום הזו היא תת-סכום להצגה בלבד; היא לא נכללת בסכום הכולל
             # למטה, אחרת עלויות הדיירים ייספרו פעמיים.
@@ -406,7 +419,7 @@ class Builder:
                           fmts=[None, None, None, NIS0, None])
 
         total_formula = ("=SUM(D%d:D%d)-D%d" % (first, r - 1, t_subtotal_row)
-                         if t_subtotal_row else "=SUM(D%d:D%d)" % (first, r - 1))
+                         if t_subtotal_row else self._sum("D", first, r - 1))
         r = self.line(ws, r, ["סה\"כ עלויות עקיפות", "", "", total_formula, ""],
                       fmts=[None, None, None, NIS0, None], bold=True, fill=TOT_FILL)
         self.ref["TOTAL_INDIRECT"] = "'עלויות עקיפות'!$D$%d" % (r - 1)
@@ -470,11 +483,13 @@ class Builder:
         # שממנו נגזרת "עלות למ"ר מכור". זה השטח שנמכר בפועל — בפינוי-בינוי הוא
         # קטן מהשטח הבנוי, כי דירות התמורה נבנות ואינן נמכרות.
         sqm_word = "שטח בנוי" if self.m.get("kind") == "income" else "שטח מכיר"
+        sqm_total = ("=SUMPRODUCT(B%d:B%d,C%d:C%d)" % (first, last_data, first, last_data)
+                     if last_data >= first else 0)
         r = self.line(ws, r, ["סה\"כ הכנסות (ו%s)" % sqm_word, "",
-                              "=SUMPRODUCT(B%d:B%d,C%d:C%d)" % (first, last_data, first, last_data),
+                              sqm_total,
                               "",
-                              "=SUM(E%d:E%d)" % (first, last_data),
-                              "=SUM(F%d:F%d)" % (first, last_data), ""],
+                              self._sum("E", first, last_data),
+                              self._sum("F", first, last_data), ""],
                       fmts=[None, None, SQM, None, NIS0, NIS0, None], bold=True, fill=TOT_FILL)
         self.ref["TOTAL_REVENUE_GROSS"] = "'הכנסות'!$E$%d" % (r - 1)
         self.ref["TOTAL_REVENUE_NET"] = "'הכנסות'!$F$%d" % (r - 1)
@@ -542,7 +557,7 @@ class Builder:
                               "=%s*%s/100" % (R["TOTAL_REVENUE_GROSS"], R["warranty_pct"]),
                               "חוק המכר (דירות) (הבטחת השקעות)"],
                       fmts=[None, None, PCT, NIS0, None])
-        r = self.line(ws, r, ["סה\"כ עלויות מימון", "", "", "=SUM(D%d:D%d)" % (first, r - 1), ""],
+        r = self.line(ws, r, ["סה\"כ עלויות מימון", "", "", self._sum("D", first, r - 1), ""],
                       fmts=[None, None, None, NIS0, None], bold=True, fill=TOT_FILL)
         self.ref["TOTAL_FINANCE"] = "'מימון'!$D$%d" % (r - 1)
         return ws
@@ -648,13 +663,13 @@ class Builder:
         profit_ref = "'תוצאות'!$B$%d" % (r - 1)
         self.ref["PROFIT"] = profit_ref
         r = self.line(ws, r, ["רווח יזמי — % מהעלויות",
-                              "=%s/%s" % (profit_ref, self.ref["TOTAL_COST"]),
+                              "=IFERROR(%s/%s,0)" % (profit_ref, self.ref["TOTAL_COST"]),
                               "המדד שבנק מלווה בוחן. סף מקובל: 15%-18%"],
                       fmts=[None, PCT, None], bold=True)
         margin_ref = "'תוצאות'!$B$%d" % (r - 1)
         self.ref["MARGIN"] = margin_ref
         r = self.line(ws, r, ["רווח יזמי — % מההכנסות",
-                              "=%s/%s" % (profit_ref, R["TOTAL_REVENUE_NET"]),
+                              "=IFERROR(%s/%s,0)" % (profit_ref, R["TOTAL_REVENUE_NET"]),
                               "מדד משלים; נמוך מהמדד על העלויות מטבעו"],
                       fmts=[None, PCT, None])
         r = self.line(ws, r, ["מס על הרווח",

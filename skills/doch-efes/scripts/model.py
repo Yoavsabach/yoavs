@@ -457,7 +457,10 @@ def build_model(project: dict, price_delta: float = 0.0, cost_delta: float = 0.0
     margin_on_cost = profit_before_tax / total_cost if total_cost else 0.0
     margin_on_revenue = profit_before_tax / revenue_net if revenue_net else 0.0
     roc = profit_after_tax / equity if equity else 0.0
-    cost_per_sold_sqm = total_cost / sellable_sqm if sellable_sqm else 0.0
+    # כשאין שטח מכיר (מכירה בסכום גלובלי, נכס מניב בלי שטח מוגדר) העלות למ"ר
+    # אינה מוגדרת — מחזירים None, לא 0. גם הבנאים (money→"—") וגם verify_excel
+    # (מדלג על None) מטפלים בזה, ולא מוצג "0 ₪/מ"ר" מטעה.
+    cost_per_sold_sqm = total_cost / sellable_sqm if sellable_sqm else None
 
     # IRR על תזרים ההון העצמי: יציאות = הון שהוזרם, כניסה אחרונה = החזר ההון
     # שהוזרם בפועל בתוספת הרווח לאחר מס.

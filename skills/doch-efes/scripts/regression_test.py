@@ -72,7 +72,27 @@ def fixtures():
                             "new_value": 2415000, "extras": {"חצר": 180000},
                             "source": "בדיקה"}],
     }
-    return {"sale": base, "renewal": renewal, "income": income}
+    # פרויקט מינימלי: הכל הון עצמי, בלי עלויות עקיפות/חניון/בצ"מ/בנצ'מרקים.
+    # זה ה"בדיקה מהירה" שהיזם מריץ בפועל, וגם המקרה שחשף באג: סקציה ריקה
+    # יצרה טווח SUM הפוך (‎D4:D3) שהחזיר ‎#NULL!‎ וזיהם את כל התזרים. אם התיקון
+    # ייסוג, verify_excel כאן ייכשל שוב.
+    minimal = {
+        "meta": {"project_name": "מינימלי — הכל הון עצמי (בדיקת רגרסיה)",
+                 "mode": "short", "kind": "sale", "date": "2026-08-23"},
+        "land": {"purchase_price": 2000000, "purchase_tax_rate": 6.0},
+        "areas": [{"use": "מגורים", "label": "עיקרי", "sqm": 400, "cost_per_sqm": 7000}],
+        "revenue": {"prices_include_vat": True,
+                    "items": [{"label": "4 יח\"ד", "units": 4, "avg_sqm": 90,
+                               "price_per_sqm": 24000}]},
+        "finance": {"equity": 20000000, "credit_rate_pct": 0.0},
+        "schedule": {"start": "2026-10-01", "quarters": 8},
+    }
+
+    return {"sale": base, "renewal": renewal, "income": income, "minimal": minimal}
+
+
+# סוגים שההיסק שלהם חייב להתאים לשם המפתח (בניגוד ל-minimal, שהוא סתם sale).
+INFERRED_KINDS = {"sale", "renewal", "income"}
 
 
 def main():
@@ -92,7 +112,7 @@ def main():
         model = build_model(project)
         print("── %s (kind=%s, מבחן=%s) ──"
               % (name, model["kind"], model["results"]["threshold_basis"]))
-        if model["kind"] != name:
+        if name in INFERRED_KINDS and model["kind"] != name:
             failures.append("%s: הסיווג יצא %s" % (name, model["kind"]))
         if name == "renewal":
             from model import tenant_consideration, betterment_scenarios
