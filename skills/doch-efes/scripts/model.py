@@ -708,6 +708,58 @@ def derive_flags(project, model):
     flags = []
     r = model["results"]
     th = r["profit_threshold"]
+    im = model.get("income_metrics")
+
+    # בנכס מניב הכישלון מתבטא במרווח, לא ברווח היזמי. בלי הדגל הזה פרויקט
+    # שנופל במבחן שלו עצמו פשוט לא מופיע ברשימת הדגלים.
+    if r.get("threshold_basis") == "spread" and im and im.get("spread_bps") is not None:
+        spread = im["spread_bps"]
+        need = r.get("min_spread_bps") or 150
+        if spread < 0:
+            flags.append({
+                "level": "red",
+                "title": "מרווח שלילי — הנכס שווה פחות מעלות הקמתו",
+                "text": "התשואה על העלות %.2f%% נמוכה משיעור ההיוון ביציאה %.2f%% "
+                        "(מרווח %d נק' בסיס). בתום ההקמה שווי הנכס נמוך מהעלות "
+                        "שהושקעה בו, וכל רווח שנותר מגיע מדמי השכירות בלבד."
+                        % (im["yield_on_cost"] * 100, im["exit_cap_rate"] * 100, round(spread)),
+            })
+        elif spread < need:
+            flags.append({
+                "level": "red",
+                "title": "מרווח תשואה צר מהנורמה",
+                "text": "המרווח בין התשואה על העלות (%.2f%%) לשיעור ההיוון ביציאה "
+                        "(%.2f%%) הוא %d נק' בסיס בלבד, מול %d הנדרשות. תנודה קטנה "
+                        "בשכירות או בשיעור ההיוון מוחקת את הרווח."
+                        % (im["yield_on_cost"] * 100, im["exit_cap_rate"] * 100,
+                           round(spread), round(need)),
+            })
+        if im.get("dscr") is not None and im["dscr"] < 1.2:
+            flags.append({
+                "level": "red" if im["dscr"] < 1.0 else "amber",
+                "title": "DSCR נמוך",
+                "text": "יחס כיסוי שירות החוב %.2f. בנק מלווה נוהג לדרוש 1.2 ומעלה."
+                        % im["dscr"],
+            })
+        if im.get("ltc", 0) > 0.70:
+            flags.append({
+                "level": "amber",
+                "title": "LTC גבוה",
+                "text": "החוב מהווה %.0f%% מסך העלות. מעל 70%% בנקים מצמצמים את "
+                        "המסגרת או דורשים בטוחות נוספות." % (im["ltc"] * 100),
+            })
+
+    # רווח חריג כלפי מעלה הוא לרוב טעות קלט, לא בשורה טובה. עדיף לומר זאת
+    # ליזם לפני שהוא מגיש את הדוח לבנק ומתבקש להסביר.
+    if r.get("threshold_basis") == "margin" and r["margin_on_cost"] > 0.30:
+        flags.append({
+            "level": "amber",
+            "title": "רווח יזמי גבוה מהמקובל — לבדוק את הקלטים",
+            "text": "הרווח היזמי %.1f%% מהעלויות, מעל הטווח המקובל של 15%%–20%%. "
+                    "לרוב זה מסמן קלט שגוי — מחיר קרקע נמוך מדי, עלות בנייה חסרה, "
+                    "או מחיר מכירה אופטימי. אמת מול עסקאות השוואה לפני הגשה."
+                    % (r["margin_on_cost"] * 100),
+        })
 
     if r["margin_on_cost"] < th:
         flags.append({
@@ -775,6 +827,20 @@ def derive_flags(project, model):
                         "ומחייב אימות מול עסקאות השוואה באזור." % pace,
             })
 
+    # התאמת התוויות ב-benchmarks נעשית לפי מחרוזת מדויקת. כשהיא נכשלת ההערה
+    # פשוט לא מופיעה, והמשתמש מאמין שהאימות רץ. עדיף להגיד שהוא לא רץ.
+    for bm in project.get("benchmarks", []) or []:
+        if not bm.get("label"):
+            continue
+        if not _label_exists(project, bm["label"]):
+            flags.append({
+                "level": "amber",
+                "title": "אסמכתה ללא התאמה בגיליון ההנחות",
+                "text": "הוגדרה אסמכתה עבור \"%s\", אבל אין פרמטר בשם הזה בגיליון "
+                        "ההנחות ולכן הערת הסטייה לא תיצמד לשום שורה. תקן את התווית "
+                        "כך שתהיה זהה." % bm["label"],
+            })
+
     for extra in project.get("flags", []) or []:
         flags.append({
             "level": extra.get("level", "amber"),
@@ -833,6 +899,29 @@ def deviation_notes(project, tolerance=0.10):
                 ),
             })
     return notes
+
+
+def _label_exists(project, label):
+    """האם התווית קיימת כפרמטר כלשהו שייכתב לגיליון ההנחות."""
+    for area in project.get("areas", []) or []:
+        name = area.get("label") or area.get("use") or ""
+        if label in ("שטח — %s" % name, "עלות למ\"ר — %s" % name):
+            return True
+    for item in (project.get("revenue") or {}).get("items", []) or []:
+        name = item.get("label", "")
+        if label in ("כמות — %s" % name, "שטח ממוצע — %s" % name,
+                     "מחיר מכירה למ\"ר — %s" % name):
+            return True
+    for item in project.get("indirect", []) or []:
+        if label == item.get("label"):
+            return True
+    known = {"מחיר רכישת הקרקע", "שיעור מס רכישה", "שכ\"ט עו\"ד ועלויות עסקה",
+             "דמי תיווך", "היטלי פיתוח בגין הקרקע", "עלויות קרקע אחרות",
+             "הצמדת עלויות למדד תשומות הבנייה", "מקומות חניה תת-קרקעיים",
+             "עלות למקום חניה", "שיעור מע\"מ", "היטל השבחה", "דמי היתר רמ\"י",
+             "בלתי צפוי מראש (בצ\"מ)", "הון עצמי", "ריבית אשראי ליווי שנתית",
+             "NOI שנתי", "שיעור היוון (Cap Rate)", "שנות החזקה עד המימוש"}
+    return label in known
 
 
 DISCLAIMER = ("מסמך זה הינו ניתוח כדאיות כלכלית ואינו מהווה דוח אפס של שמאי מקרקעין "

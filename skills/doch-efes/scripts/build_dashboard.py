@@ -301,6 +301,16 @@ def build_html(data):
         ("סך הכנסות", full_money(r["total_revenue_net"]),
          "נטו ממע\"מ · ברוטו %s" % money(r["total_revenue_gross"]), ""),
     ]
+    im = m.get("income_metrics")
+    if im:
+        kpis = kpis[:2] + [
+            ("מרווח תשואה", "%d נק'" % round(im.get("spread_bps") or 0),
+             "תשואה על העלות %s מול היוון %s" % (percent(im.get("yield_on_cost"), 2),
+                                                  percent(im.get("exit_cap_rate"), 2)),
+             "good" if ok else "bad"),
+            ("DSCR · LTC", "%.2f · %s" % (im.get("dscr") or 0, percent(im.get("ltc"))),
+             "כיסוי שירות החוב · שיעור החוב מהעלות", "info"),
+        ] + kpis[2:]
     kpi_html = "".join(
         '<div class="kpi %s"><div class="v">%s</div><div class="l">%s</div>'
         '<div class="n">%s</div></div>' % (cls, esc(v), esc(label), esc(note))
@@ -316,7 +326,11 @@ def build_html(data):
     ]
     cost_rows = [[l["label"], full_money(l["amount"])] for l in m["land"]["lines"]]
     cost_rows += [[l["label"], full_money(l["amount"])] for l in m["direct"]["lines"]]
-    cost_rows += [[l["label"], full_money(l["amount"])] for l in m["indirect"]["lines"]]
+    cost_rows += [[("מזה: " if l.get("group") == "tenants" else "") + l["label"],
+                   full_money(l["amount"])] for l in m["indirect"]["lines"]]
+    if (m.get("tenants") or {}).get("lines"):
+        cost_rows += [["<b>סה\"כ עלויות הטיפול בדיירים (מזה)</b>",
+                       "<b>%s</b>" % full_money(m["tenants"]["total"])]]
     cost_rows += [["בצ\"מ (%s)" % percent(m["contingency"]["pct"]),
                    full_money(m["contingency"]["amount"])]]
     cost_rows += [[l["label"], full_money(l["amount"])] for l in m["finance"]["lines"]]

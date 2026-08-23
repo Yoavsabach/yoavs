@@ -149,7 +149,10 @@ class Report:
 
     def h(self, text, level=1):
         sizes = {0: 20, 1: 15, 2: 13, 3: 12}
-        p = self.doc.add_paragraph()
+        # סגנון Heading אמיתי ולא רק טקסט מודגש: בלעדיו אין חלונית ניווט
+        # ב-Word ואי אפשר לייצר תוכן עניינים — בדוח בן 13 פרקים זה מורגש.
+        style = {1: "Heading 1", 2: "Heading 2", 3: "Heading 3"}.get(level)
+        p = self.doc.add_paragraph(style=style) if style else self.doc.add_paragraph()
         rtl_para(p, "center" if level == 0 else "right")
         rtl_run(p, text, bold=True, size=sizes.get(level, 12), color=NAVY)
         p.paragraph_format.space_before = Pt(14 if level <= 1 else 10)
@@ -254,6 +257,11 @@ class Report:
                 ["רווח יזמי לפני מס", money(r["profit_before_tax"])],
                 ["רווח יזמי — % מהעלויות", percent(r["margin_on_cost"])],
                 ["רווח יזמי — % מההכנסות", percent(r["margin_on_revenue"])],
+            ] + ([
+                ["תשואה על העלות", percent((self.m.get("income_metrics") or {}).get("yield_on_cost"), 2)],
+                ["שיעור היוון ביציאה", percent((self.m.get("income_metrics") or {}).get("exit_cap_rate"), 2)],
+                ["מרווח", "%d נק' בסיס" % round((self.m.get("income_metrics") or {}).get("spread_bps") or 0)],
+            ] if r.get("threshold_basis") == "spread" else []) + [
                 ["IRR שנתי על ההון העצמי",
                  percent(r["irr_annual"]) if r["irr_annual"] is not None else "לא ניתן לחישוב"],
                 [self._sqm_label(), money(r["cost_per_sold_sqm"])],
@@ -261,7 +269,29 @@ class Report:
             ], widths=[90, 60])
 
         th = r["profit_threshold"]
-        if r["meets_threshold"]:
+        im = self.m.get("income_metrics") or {}
+        if r.get("threshold_basis") == "spread":
+            spread = im.get("spread_bps")
+            need = r.get("min_spread_bps") or 150
+            if r["meets_threshold"]:
+                verdict = ("התשואה על העלות %s מול שיעור היוון ביציאה %s — מרווח של "
+                           "%d נקודות בסיס, מעל %d הנדרשות. הרווח לפני מס %s. בכפוף "
+                           "לאימות דמי השכירות ושיעור ההיוון מול עסקאות השוואה, "
+                           "הפרויקט עומד במבחן."
+                           % (percent(im.get("yield_on_cost"), 2),
+                              percent(im.get("exit_cap_rate"), 2),
+                              round(spread or 0), round(need),
+                              money(r["profit_before_tax"])))
+            else:
+                verdict = ("התשואה על העלות %s מול שיעור היוון ביציאה %s — מרווח של "
+                           "%d נקודות בסיס בלבד, מול %d הנדרשות. בנכס מניב זהו המבחן "
+                           "הקובע, ולא סף הרווח היזמי: מרווח צר פירושו שהנכס שווה "
+                           "כמעט בדיוק את עלות הקמתו. במתכונת הנוכחית הפרויקט אינו "
+                           "עומד במבחן."
+                           % (percent(im.get("yield_on_cost"), 2),
+                              percent(im.get("exit_cap_rate"), 2),
+                              round(spread or 0), round(need)))
+        elif r["meets_threshold"]:
             verdict = ("הפרויקט מציג רווח יזמי של %s, המהווה %s מסך העלויות — מעל סף "
                        "ה-%s הנהוג בליווי בנקאי. בכפוף לאימות ההנחות ולטיפול בדגלים "
                        "המפורטים בפרק הדגלים, הפרויקט נמצא כדאי כלכלית."
@@ -325,11 +355,15 @@ class Report:
                    widths=[52, 28, 32, 38])
 
         self.sub("עלויות עקיפות")
+        rows = [[("מזה: " if l.get("group") == "tenants" else "") + l["label"],
+                 percent(l["pct"]) if l["pct"] else "—", money(l["amount"])]
+                for l in self.m["indirect"]["lines"]]
         self.table(["סעיף", "שיעור", "סכום"],
-                   [[l["label"], percent(l["pct"]) if l["pct"] else "—", money(l["amount"])]
-                    for l in self.m["indirect"]["lines"]] +
-                   [["סה\"כ עלויות עקיפות", "", money(self.m["indirect"]["total"])]],
+                   rows + [["סה\"כ עלויות עקיפות", "", money(self.m["indirect"]["total"])]],
                    widths=[80, 30, 40])
+        if (self.m.get("tenants") or {}).get("lines"):
+            self.para("השורות המסומנות \"מזה\" מפורטות שוב בפרק עלויות הטיפול "
+                      "בדיירים. הן נספרות פעם אחת בלבד בסך העלויות.", size=11)
 
         self.sub("בלתי צפוי מראש (בצ\"מ)")
         c = self.m["contingency"]
@@ -484,7 +518,7 @@ class Report:
         devs = self.d["deviations"]
         if devs:
             self.sub("סטיות מאסמכתאות חיצוניות")
-            self.para("הקלטים הבאים סוטים ביותר מ-10%% מהאסמכתה החיצונית שאותרה. הקלט "
+            self.para("הקלטים הבאים סוטים ביותר מ-10% מהאסמכתה החיצונית שאותרה. הקלט "
                       "לא שונה — ההחלטה על המספר היא של היזם — אך הפער מדווח במפורש:")
             self.bullets([d["text"] for d in devs])
 

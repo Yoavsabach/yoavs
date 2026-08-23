@@ -259,6 +259,8 @@ class Deck:
             ["קרקע ורכישה", money(m["land"]["total"], short=True)],
             ["בנייה ישירה", money(m["direct"]["total"], short=True)],
             ["עלויות עקיפות", money(m["indirect"]["total"], short=True)],
+        ] + ([["מזה: טיפול בדיירים", money(m["tenants"]["total"], short=True)]]
+             if (m.get("tenants") or {}).get("lines") else []) + [
             ["בצ\"מ", money(m["contingency"]["amount"], short=True)],
             ["מימון", money(m["finance"]["total"], short=True)],
             ["סה\"כ שימושים", money(m["results"]["total_cost"], short=True)],

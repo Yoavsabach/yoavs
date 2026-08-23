@@ -167,10 +167,16 @@ class Builder:
         src = land.get("source", "")
         add("קרקע", "land_price", "מחיר רכישת הקרקע", num(land.get("purchase_price")), "₪", src, NIS0)
         add("קרקע", "purchase_tax_rate", "שיעור מס רכישה", num(land.get("purchase_tax_rate"), 6), "%", "tax-rules.md")
-        add("קרקע", "legal_pct", "שכ\"ט עו\"ד ועלויות עסקה", num(land.get("legal_pct")), "%", src)
-        add("קרקע", "brokerage_pct", "דמי תיווך", num(land.get("brokerage_pct")), "%", src)
-        add("קרקע", "dev_levies", "היטלי פיתוח בגין הקרקע", num(land.get("development_levies")), "₪", src, NIS0)
-        add("קרקע", "land_other", "עלויות קרקע אחרות", num(land.get("other")), "₪", src, NIS0)
+        # המקור שייך לשורת מחיר הקרקע. הדבקתו על חמש שורות יוצרת מראה של
+        # אסמכתה גם לשורות שאיש לא אימת.
+        add("קרקע", "legal_pct", "שכ\"ט עו\"ד ועלויות עסקה", num(land.get("legal_pct")), "%",
+            land.get("legal_source", ""))
+        add("קרקע", "brokerage_pct", "דמי תיווך", num(land.get("brokerage_pct")), "%",
+            land.get("brokerage_source", ""))
+        add("קרקע", "dev_levies", "היטלי פיתוח בגין הקרקע", num(land.get("development_levies")), "₪",
+            land.get("levies_source", ""), NIS0)
+        add("קרקע", "land_other", "עלויות קרקע אחרות", num(land.get("other")), "₪",
+            land.get("other_source", ""), NIS0)
 
         idx = p.get("indexation", {}) or {}
         add("הצמדה", "index_uplift", "הצמדת עלויות למדד תשומות הבנייה",
@@ -252,8 +258,14 @@ class Builder:
             "חוק המכר (דירות) (הבטחת השקעות)")
 
         add("ספי בקרה", "threshold", "סף רווח יזמי מזערי",
-            num((p.get("thresholds") or {}).get("min_profit_on_cost_pct"), 15), "%",
-            "cost-benchmarks.md — דרישת בנק מלווה")
+            self.m["results"]["profit_threshold"] * 100, "%",
+            "cost-benchmarks.md — דרישת בנק מלווה"
+            if self.m["results"]["threshold_basis"] == "margin"
+            else "לא חל על נכס מניב — המבחן הוא המרווח")
+        if self.m["results"]["threshold_basis"] == "spread":
+            add("ספי בקרה", "min_spread", "מרווח תשואה מזערי (נק' בסיס)",
+                self.m["results"].get("min_spread_bps") or 150, "נק' בסיס",
+                "נורמה בייזום מניב: 150–200", QTY)
 
         sched = p.get("schedule", {}) or {}
         add("לוח זמנים", "quarters", "משך הפרויקט", num(sched.get("quarters"), 12), "רבעונים", "", QTY)
@@ -442,7 +454,8 @@ class Builder:
         # עמודה C בשורת הסיכום מחזיקה את סך השטח המכיר (יחידות × שטח ממוצע),
         # שממנו נגזרת "עלות למ"ר מכור". זה השטח שנמכר בפועל — בפינוי-בינוי הוא
         # קטן מהשטח הבנוי, כי דירות התמורה נבנות ואינן נמכרות.
-        r = self.line(ws, r, ["סה\"כ הכנסות (ושטח מכיר)", "",
+        sqm_word = "שטח בנוי" if self.m.get("kind") == "income" else "שטח מכיר"
+        r = self.line(ws, r, ["סה\"כ הכנסות (ו%s)" % sqm_word, "",
                               "=SUMPRODUCT(B%d:B%d,C%d:C%d)" % (first, last_data, first, last_data),
                               "",
                               "=SUM(E%d:E%d)" % (first, last_data),
@@ -654,6 +667,40 @@ class Builder:
         r = self.line(ws, r, ["שיא ניצול אשראי", "=%s" % self.ref["PEAK_DEBT"],
                               "מסגרת הליווי הנדרשת"], fmts=[None, NIS0, None])
         r += 1
+        im = self.m.get("income_metrics")
+        if self.m["results"]["threshold_basis"] == "spread" and im:
+            # בנכס מניב המבחן הוא המרווח. הצגת "סף רווח יזמי" כאן סותרת את
+            # הדוח ומטעה את מי שקורא רק את האקסל.
+            r = self.line(ws, r, ["תשואה על העלות (Yield on Cost)",
+                                  "=%s/%s" % (R["noi"], self.ref["TOTAL_COST"]),
+                                  "NOI שנתי חלקי סך עלות הפרויקט"],
+                          fmts=[None, '0.00%', None], bold=True)
+            yoc_ref = "'תוצאות'!$B$%d" % (r - 1)
+            r = self.line(ws, r, ["שיעור היוון ביציאה (Exit Cap)", "=%s/100" % R["cap_rate"],
+                                  "מגיליון ההנחות"], fmts=[None, '0.00%', None])
+            r = self.line(ws, r, ["מרווח (נק' בסיס)",
+                                  "=(%s-%s/100)*10000" % (yoc_ref, R["cap_rate"]),
+                                  "נורמה בייזום מניב: 150–200"], fmts=[None, '#,##0', None], bold=True)
+            spread_ref = "'תוצאות'!$B$%d" % (r - 1)
+            r = self.line(ws, r, ["שיעור היוון לאיזון", "=%s" % yoc_ref,
+                                  "מעליו הפרויקט מפסיד"], fmts=[None, '0.00%', None])
+            r = self.line(ws, r, ["מרווח מזערי נדרש", "=%s" % R["min_spread"],
+                                  "מגיליון ההנחות"], fmts=[None, '#,##0', None])
+            r = self.line(ws, r, ["עמידה במבחן המרווח",
+                                  "=IF(%s>=%s,\"עומד במבחן\",\"אינו עומד במבחן\")"
+                                  % (spread_ref, R["min_spread"]),
+                                  "בנכס מניב זהו המבחן הקובע, לא סף הרווח היזמי"],
+                          fmts=[None, None, None], bold=True)
+            check_cell = ws.cell(row=r - 1, column=2)
+            ws.conditional_formatting.add(check_cell.coordinate, CellIsRule(
+                operator="equal", formula=['"עומד במבחן"'],
+                fill=PatternFill("solid", fgColor=GREEN)))
+            ws.conditional_formatting.add(check_cell.coordinate, CellIsRule(
+                operator="equal", formula=['"אינו עומד במבחן"'],
+                fill=PatternFill("solid", fgColor=RED)))
+            self.note(ws, r + 1, DISCLAIMER, 3)
+            return ws
+
         r = self.line(ws, r, ["סף רווח יזמי נדרש", "=%s/100" % R["threshold"], "מגיליון ההנחות"],
                       fmts=[None, PCT, None])
         r = self.line(ws, r, ["עמידה בסף",
