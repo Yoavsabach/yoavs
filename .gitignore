@@ -16,3 +16,6 @@ skills/*-workspace/review-*.html
 # פלט חי של לולאת אופטימיזציית ה-description — נוצר מחדש בהרצה
 skills/*-workspace/desc-opt/
 skills/*-workspace/*.log
+
+# חבילת הסקיל — נבנית מחדש עם package_skill
+skills/*.skill
