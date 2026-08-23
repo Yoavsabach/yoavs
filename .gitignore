@@ -8,3 +8,6 @@ package-lock.json
 
 # תוצרי הרצות eval של סקילים — בינאריים וכבדים, נוצרים מחדש בהרצה
 skills/*-workspace/iteration-*/**/outputs/
+
+__pycache__/
+*.pyc
