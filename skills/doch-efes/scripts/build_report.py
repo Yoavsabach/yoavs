@@ -371,6 +371,114 @@ class Report:
                   "בנקאי הוא 5%%–10%%; שיעור נמוך מכך נבחן על ידי הבנק המלווה."
                   % (percent(c["pct"]), money(c["base"]), money(c["amount"])))
 
+    def takan21_part_b(self):
+        """חלק ב' — התמורה לבעלי היחידות האופייניות (ס' 5.1–5.13).
+
+        "דירה אופיינית" בתקנות היא דירה טיפוסית עד קומה רביעית, **בלי** הצמדות
+        ספציפיות. חלק ב' הוא הבסיס שעליו נשענים שמאי פינוי-בינוי ושמאי הדיירים,
+        ולכן המבנה חשוב לא פחות מהמספרים.
+        """
+        tc = self.d.get("tenant_consideration") or {}
+        self.chapter("חלק ב' — התמורה לבעלי היחידות האופייניות (תקן 21, ס' 5)")
+        need = "— להשלמה בידי עורך השומה"
+        meta = self.m["meta"]
+        self.table(["ס'", "פרט", "תוכן"], [
+            ["5.1", "סוג השומה", "בדיקת התמורה לבעלי היחידות האופייניות במקבץ"],
+            ["5.2", "זהות מזמין השומה", meta.get("client") or need],
+            ["5.3", "מטרת השומה", "בחינת התמורה לפי חוק פינוי בינוי ותקנותיו"],
+            ["5.4", "המועד הקובע", meta.get("date") or need],
+            ["5.5", "מועד הביקור וזהות המבקר", need],
+            ["5.6", "פרטי זיהוי היחידות", "%d יחידות אופייניות" % tc.get("units", 0)
+             if tc.get("units") else need],
+            ["5.7", "תיאור המקבץ והסביבה", need],
+            ["5.8", "המצב התכנוני המאושר", meta.get("plan") or need],
+            ["5.9", "המצב המשפטי", need],
+            ["5.10", "עקרונות, גורמים ושיקולים", "ראה פרק המתודולוגיה"],
+        ], widths=[14, 56, 80])
+
+        if not tc.get("typical"):
+            self.para("לא הוזנו נתוני דירות אופייניות. סעיפים 5.11–5.13 מחייבים "
+                      "שומת שווי לדירה לפני ואחרי, שהיא עבודת שמאי מקרקעין מוסמך "
+                      "ואינה נגזרת מהמודל הכלכלי. השלם את הבלוק "
+                      "`tenant_consideration.typical_units` או צרף שומה נפרדת.",
+                      bold=True)
+            return
+
+        self.sub("5.11–5.12 עקרונות התמורה והתחשיב")
+        rows = []
+        for t in tc["typical"]:
+            rows.append([
+                t["label"], str(t["count"]),
+                "%s מ\"ר" % format(round(t["existing_sqm"]), ","), money(t["existing_value"]),
+                "%s מ\"ר" % format(round(t["new_sqm"]), ","), money(t["new_value"]),
+                money(t["extras_total"]) if t["extras_total"] else "—",
+                money(t["uplift"]),
+                ("%.2f" % t["ratio"]) if t["ratio"] else "—",
+            ])
+        self.table(["דירה אופיינית", "כמות", "שטח קיים", "שווי לפני",
+                    "שטח חדש", "שווי אחרי", "הצמדות", "פער", "יחס"],
+                   rows, widths=[26, 12, 18, 24, 18, 24, 18, 24, 12])
+
+        self.sub("5.13 השומה")
+        if tc.get("avg_ratio"):
+            self.para("היחס המשוקלל בין שווי הדירה אחרי לשווי לפני עומד על %.2f, "
+                      "והפער הכולל לכלל %d היחידות האופייניות הוא %s."
+                      % (tc["avg_ratio"], tc["units"], money(tc["total_uplift"])), bold=True)
+        self.para("השוויים שלעיל נמסרו כקלט ואינם נקבעו על ידי הכלי. קביעת שווי "
+                  "לפני ואחרי היא עבודת שמאי מקרקעין מוסמך, ובמחלוקת — של שמאי "
+                  "פינוי-בינוי שמונה לפי תקנות פינוי ובינוי (פיצויים), התשע\"א-2011.")
+
+    def takan21_part_c(self):
+        """חלק ג' — התמורה בגין דירה מסוימת (ס' 6.1–6.13).
+
+        ההבדל מחלק ב' אינו טכני: בדירה מסוימת ההצמדות הספציפיות — גג, חצר,
+        מחסן — כן נספרות, וזה בדיוק מה שדייר בודד בא לברר.
+        """
+        tc = self.d.get("tenant_consideration") or {}
+        if not tc.get("specific"):
+            return
+        self.chapter("חלק ג' — התמורה בגין דירה מסוימת (תקן 21, ס' 6)")
+        meta = self.m["meta"]
+        need = "— להשלמה בידי עורך השומה"
+        self.table(["ס'", "פרט", "תוכן"], [
+            ["6.1", "סוג השומה", "בדיקת הכדאיות הכלכלית של התמורה בגין דירה מסוימת"],
+            ["6.3", "מטרת השומה", "לפי תקנות פינוי ובינוי (פיצויים), התשע\"א-2011"],
+            ["6.4", "המועד הקובע", meta.get("date") or need],
+            ["6.5", "מועד הביקור וזהות המבקר", need],
+            ["6.9", "המצב המשפטי וההצמדות", need],
+        ], widths=[14, 56, 80])
+
+        self.sub("6.11–6.12 התמורה לדירה והתחשיב")
+        rows = []
+        for t in tc["specific"]:
+            extras = "; ".join("%s %s" % (k, money(v)) for k, v in (t["extras"] or {}).items())
+            rows.append([
+                t["label"],
+                "%s מ\"ר" % format(round(t["existing_sqm"]), ","), money(t["existing_value"]),
+                "%s מ\"ר" % format(round(t["new_sqm"]), ","), money(t["new_value"]),
+                extras or "—", money(t["uplift"]),
+                ("%.2f" % t["ratio"]) if t["ratio"] else "—",
+            ])
+        self.table(["הדירה", "שטח קיים", "שווי לפני", "שטח חדש", "שווי אחרי",
+                    "הצמדות ספציפיות", "פער", "יחס"], rows,
+                   widths=[26, 18, 24, 18, 24, 30, 24, 12])
+        self.para("הצמדות ספציפיות נספרות בחלק ג' בלבד. בחלק ב' הן אינן חלק "
+                  "מאפיון הדירה הטיפוסית, בהתאם להגדרת \"דירה אופיינית\" בתקנות.")
+
+    def betterment_chapter(self):
+        """תקן 21 ס' 4.14(ה) מחייב להציג חיוב בהיטל השבחה וגם פטור. בפינוי-בינוי
+        הפטור אינו ודאי, וההפרש בין התרחישים הוא לעיתים ההבדל בין כדאי ללא."""
+        sc = self.d.get("betterment_scenarios") or []
+        if not sc:
+            return
+        self.chapter("תרחישי היטל השבחה")
+        self.para("היטל ההשבחה בפינוי-בינוי תלוי בהחלטת הרשות המקומית ואינו ודאי "
+                  "מראש. להלן התוצאה בכל תרחיש:")
+        self.table(["תרחיש", "היטל", "רווח יזמי", "% מהעלויות", "עומד בסף"],
+                   [[x["label"], money(x["amount"]), money(x["profit"]),
+                     percent(x["margin"]), "כן" if x["meets"] else "לא"] for x in sc],
+                   widths=[50, 30, 34, 24, 20])
+
     def tenant_costs(self):
         """תקן 21 ס' 4.14(ד) מטפל בעלויות הדיירים כפרק עצמאי, ובצדק: זה המספר
         הראשון שהדיירים, הרשות והשמאי שואלים עליו. פיזור השורות בתוך העקיפות
@@ -485,6 +593,17 @@ class Report:
                          money(be["threshold_price_per_sqm"]),
                          "%s ממחיר הבסיס" % percent(be["threshold_price_delta"])])
         self.table(["מדד", "מחיר למ\"ר", "פער ממחיר הבסיס"], rows, widths=[65, 40, 45])
+        # תקן 21 ס' 4.15: כשהתכנית אינה כדאית, לקבוע באילו תנאים תהיה. בוועדת
+        # התחדשות הציר הנדון הוא מספר היחידות, לא המחיר.
+        if be.get("zero_profit_units") or be.get("threshold_units"):
+            self.sub("מספר יחידות נדרש")
+            urows = []
+            if be.get("zero_profit_units"):
+                urows.append(["לאיזון (רווח אפס)", "%d יח\"ד" % round(be["zero_profit_units"])])
+            if be.get("threshold_units"):
+                urows.append(["לעמידה בסף %s" % percent(be["threshold"], 0),
+                              "%d יח\"ד" % round(be["threshold_units"])])
+            self.table(["מדד", "מספר יחידות למכירה"], urows, widths=[80, 55])
 
     def _sqm_label(self):
         return "עלות למ\"ר בנוי" if self.kind == "income" else "עלות למ\"ר מכור"
@@ -581,6 +700,41 @@ class Report:
         self.para("סעיפים 4.6 ו-4.11 מחייבים ביקור בפועל ובדיקת זכויות, ואינם "
                   "ניתנים לגזירה מהמודל הכלכלי. יש להשלימם בטרם הגשה.", bold=True)
 
+        self.sub("מפת הסעיפים 4.8–4.15 אל פרקי הדוח")
+        self.para("התקן מגדיר מבנה סעיפים; הדוח שלהלן ממלא אותו. הטבלה מראה היכן "
+                  "כל סעיף נענה, ומה נותר להשלמה ידנית.")
+        self.table(["ס'", "הסעיף בתקן", "היכן בדוח"], [
+            ["4.8", "תיאור המתחם והסביבה", "להשלמה בידי עורך השומה"],
+            ["4.9", "המצב התכנוני המאושר", "פרק המצב התכנוני"],
+            ["4.10", "התכנית המוצעת לפינוי בינוי", "פרק המצב התכנוני + פרוגרמת השטחים"],
+            ["4.11", "המצב המשפטי (הזכויות בנכס)", "להשלמה — בדיקת נסחים וזכויות"],
+            ["4.12", "עקרונות, גורמים ושיקולים", "פרק המתודולוגיה"],
+            ["4.13", "עקרונות לתמורות לבעלי הדירות", "חלק ב' שלהלן"],
+            ["4.14", "התחשיב (א–ט)", "פרקי העלויות, ההכנסות, המימון והתוצאות"],
+            ["4.15", "השומה ונקודות האיזון", "פרק נקודות האיזון"],
+        ], widths=[14, 66, 70])
+
+        self.sub("פירוט התחשיב לפי ס' 4.14")
+        m = self.m
+        rows = [
+            ["א", "פרוגרמה תכנונית", "פרק המצב התכנוני"],
+            ["ב", "אומדן תקבולים", money(m["results"]["total_revenue_net"])],
+            ["ג", "עלות הקמת הפרויקט",
+             money(m["direct"]["total"] + m["indirect"]["total"] + m["contingency"]["amount"])],
+            ["ד", "עלויות הטיפול בדיירים",
+             money((m.get("tenants") or {}).get("total", 0)) if (m.get("tenants") or {}).get("lines")
+             else "לא הוזנו — ראה בלוק tenants"],
+            ["ה", "עלויות מיסוי",
+             money(sum(l["amount"] for l in m["indirect"]["lines"]
+                       if l.get("group") == "tenants_tax"
+                       or l["label"] in ("היטל השבחה", "דמי היתר רמ\"י")))],
+            ["ו", "הוצאות מימון", money(m["finance"]["total"])],
+            ["ז", "רווח היזם", money(m["results"]["profit_before_tax"])],
+            ["ח", "תשלומים לרכישת זכויות", money(m["land"]["total"])],
+            ["ט", "הוצאות מיוחדות", "ראה פירוט העלויות העקיפות"],
+        ]
+        self.table(["ס'", "רכיב התחשיב", "סכום / הפניה"], rows, widths=[14, 66, 70])
+
     def build(self, path):
         self.cover()
         self.executive_summary()
@@ -599,6 +753,7 @@ class Report:
             self.results()
             self.income_asset_metrics()
             self.break_even_chapter()
+            self.betterment_chapter()
             self.sensitivity()
             self.flags()
             self.methodology()
@@ -613,6 +768,10 @@ class Report:
             self.results()
             self.income_asset_metrics()
             self.break_even_chapter()
+            self.betterment_chapter()
+            if self.mode == "takan21":
+                self.takan21_part_b()
+                self.takan21_part_c()
             self.sensitivity()
             self.flags()
             self.methodology()

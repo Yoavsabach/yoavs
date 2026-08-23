@@ -54,6 +54,24 @@ def fixtures():
                           "contingency_pct": 10, "source": "בדיקה"}
     renewal["assumptions_notes"] = [{"label": "מקדם שטחי שירות", "value": "28%",
                                      "source": "הנחה"}]
+    # חלקים ב' ו-ג' של תקן 21 ורכיבי המיסוי של ס' 4.14(ה). בלי כיסוי כאן,
+    # שורות שנכנסות למנוע ולא לאקסל חוזרות בשקט — כפי שכבר קרה פעמיים.
+    renewal["tax"]["purchase_tax_on_tenant_rights"] = 1800000
+    renewal["tax"]["vat_on_tenant_construction"] = 2400000
+    renewal["betterment_scenarios"] = [
+        {"label": "פטור מלא", "amount": 0},
+        {"label": "חיוב 25%", "amount": 3200000},
+    ]
+    renewal["tenant_consideration"] = {
+        "typical_units": [{"label": "דירה אופיינית 3 חדרים", "count": 30,
+                           "existing_sqm": 68, "existing_value": 1150000,
+                           "new_sqm": 110, "new_value": 2310000,
+                           "extras": {"מחסן": 60000}, "source": "בדיקה"}],
+        "specific_units": [{"label": "דירה 7 — הצמדת חצר", "existing_sqm": 72,
+                            "existing_value": 1210000, "new_sqm": 115,
+                            "new_value": 2415000, "extras": {"חצר": 180000},
+                            "source": "בדיקה"}],
+    }
     return {"sale": base, "renewal": renewal, "income": income}
 
 
@@ -76,6 +94,13 @@ def main():
               % (name, model["kind"], model["results"]["threshold_basis"]))
         if model["kind"] != name:
             failures.append("%s: הסיווג יצא %s" % (name, model["kind"]))
+        if name == "renewal":
+            from model import tenant_consideration, betterment_scenarios
+            tc = tenant_consideration(project)
+            if not tc["typical"] or not tc["specific"]:
+                failures.append("renewal: חלקים ב'/ג' לא חושבו")
+            if len(betterment_scenarios(project)) != 2:
+                failures.append("renewal: תרחישי היטל השבחה לא חושבו")
 
         for script, ext in [("build_excel", "xlsx"), ("build_report", "docx"),
                             ("build_deck", "pptx"), ("build_dashboard", "html")]:

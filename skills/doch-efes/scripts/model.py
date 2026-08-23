@@ -329,6 +329,17 @@ def build_model(project: dict, price_delta: float = 0.0, cost_delta: float = 0.0
 
     tenants_total = sum(l["amount"] for l in tenant_lines)
 
+    # תקן 21 ס' 4.14(ה) מונה במפורש שני רכיבי מיסוי שקיימים רק בפינוי-בינוי
+    # ונוטים ליפול בין הכיסאות: מס רכישה בגין רכישת זכויות הדיירים, ומע"מ על
+    # שירותי הבנייה לדיירים שאינו ניתן לקיזוז. שניהם מכבידים על התוצאה.
+    for key, label in [("purchase_tax_on_tenant_rights", "מס רכישה בגין רכישת זכויות הדיירים"),
+                       ("vat_on_tenant_construction", "מע\"מ על שירותי בנייה לדיירים (שאינו בר-קיזוז)")]:
+        v = num(tax.get(key))
+        if v:
+            indirect_lines.append({"label": label, "basis": "fixed", "pct": 0.0,
+                                   "amount": v, "group": "tenants_tax",
+                                   "source": tax.get(key + "_source", "") or "תקן 21 ס' 4.14(ה)"})
+
     betterment = num(tax.get("betterment_levy"))
     if betterment:
         indirect_lines.append({
@@ -559,6 +570,83 @@ def build_model(project: dict, price_delta: float = 0.0, cost_delta: float = 0.0
     }
 
 
+def tenant_consideration(project):
+    """מחשב את התמורה לדיירים — הבסיס לחלקים ב' ו-ג' של תקן 21.
+
+    חלק ב' בוחן דירה **אופיינית** (כהגדרתה בתקנות: דירה טיפוסית עד קומה
+    רביעית, בלי הצמדות ספציפיות); חלק ג' בוחן **דירה מסוימת**, שבה ההצמדות
+    כן נספרות. ההפרדה אינה טכנית — שמאי פינוי-בינוי נדרש להציג את שתיהן,
+    והדייר שמחזיק דירה עם הצמדת גג רוצה לראות את המספר שלו ולא ממוצע.
+
+    הכלי מחשב את הפער ואת היחס מהנתונים שנמסרו. **הוא אינו קובע שווי** —
+    שומת השווי לפני ואחרי היא עבודת שמאי מוסמך, וכל ערך כאן מגיע מהמשתמש.
+    """
+    tc = project.get("tenant_consideration") or {}
+
+    def rows(items, with_extras):
+        out = []
+        for it in items or []:
+            extras = it.get("extras") or {}
+            extras_total = sum(num(v) for v in extras.values()) if with_extras else 0.0
+            before = num(it.get("existing_value"))
+            after = num(it.get("new_value")) + extras_total
+            out.append({
+                "label": it.get("label", "דירה"),
+                "count": int(num(it.get("count"), 1)),
+                "existing_sqm": num(it.get("existing_sqm")),
+                "existing_value": before,
+                "new_sqm": num(it.get("new_sqm")),
+                "new_value": num(it.get("new_value")),
+                "extras": extras if with_extras else {},
+                "extras_total": extras_total,
+                "total_after": after,
+                "uplift": after - before,
+                "ratio": (after / before) if before else None,
+                "notes": it.get("notes", ""),
+                "source": it.get("source", ""),
+            })
+        return out
+
+    typical = rows(tc.get("typical_units"), with_extras=True)
+    specific = rows(tc.get("specific_units"), with_extras=True)
+    units = sum(r["count"] for r in typical)
+    return {
+        "typical": typical,
+        "specific": specific,
+        "units": units,
+        "total_uplift": sum(r["uplift"] * r["count"] for r in typical),
+        "avg_ratio": (sum(r["ratio"] * r["count"] for r in typical if r["ratio"]) / units)
+                     if units and any(r["ratio"] for r in typical) else None,
+        "source": tc.get("source", ""),
+    }
+
+
+def betterment_scenarios(project):
+    """מריץ את המודל תחת כמה תרחישי היטל השבחה.
+
+    תקן 21 ס' 4.14(ה) מחייב להציג את החיוב **וגם** את הפטור: בפינוי-בינוי
+    הפטור אינו ודאי, וההפרש בין שני התרחישים הוא לעיתים ההבדל בין פרויקט
+    כדאי ללא-כדאי. הצגת תרחיש אחד בלבד מסתירה את הסיכון.
+    """
+    scenarios = project.get("betterment_scenarios") or []
+    if not scenarios:
+        return []
+    out = []
+    for sc in scenarios:
+        variant = copy.deepcopy(project)
+        variant.setdefault("tax", {})["betterment_levy"] = num(sc.get("amount"))
+        m = build_model(variant)
+        out.append({
+            "label": sc.get("label", "תרחיש"),
+            "amount": num(sc.get("amount")),
+            "profit": m["results"]["profit_before_tax"],
+            "margin": m["results"]["margin_on_cost"],
+            "meets": m["results"]["meets_threshold"],
+            "source": sc.get("source", ""),
+        })
+    return out
+
+
 def project_kind(project):
     """מסווג את **כלכלת** הפרויקט. אל תבלבל בין זה לבין ``meta.mode``.
 
@@ -670,11 +758,37 @@ def break_even(project):
 
     zero_d = solve(0.0)
     th_d = solve(th) if th else None
+
+    # ס' 4.15 דורש לקבוע באילו תנאים התכנית תהיה כדאית. מחיר הוא ציר אחד;
+    # בפינוי-בינוי הציר שהוועדה באמת דנה בו הוא מספר היחידות.
+    def solve_units(target):
+        items = (project.get("revenue") or {}).get("items") or []
+        if not items or not num(items[0].get("units")):
+            return None
+        base_units = num(items[0].get("units"))
+        lo, hi = 1.0, base_units * 6
+        def f(u):
+            v = copy.deepcopy(project)
+            v["revenue"]["items"][0]["units"] = u
+            return build_model(v)["results"]["margin_on_cost"] - target
+        if f(hi) < 0:
+            return None
+        if f(lo) > 0:
+            return lo
+        for _ in range(50):
+            mid = (lo + hi) / 2
+            if f(mid) < 0:
+                lo = mid
+            else:
+                hi = mid
+        return hi
     return {
         "zero_profit_price_delta": zero_d,
         "zero_profit_price_per_sqm": price_at(zero_d),
         "threshold_price_delta": th_d,
         "threshold_price_per_sqm": price_at(th_d),
+        "zero_profit_units": solve_units(0.0),
+        "threshold_units": solve_units(th) if th else None,
         "threshold": th,
     }
 
@@ -935,6 +1049,8 @@ def full_output(project):
         "project": project,
         "model": model,
         "break_even": break_even(project),
+        "tenant_consideration": tenant_consideration(project),
+        "betterment_scenarios": betterment_scenarios(project),
         "sensitivity": sensitivity_grid(project),
         "sensitivity_profit": sensitivity_grid(project, metric="profit_before_tax"),
         "rate_scenarios": rate_scenarios(project),

@@ -216,6 +216,12 @@ class Builder:
                 line.get("source", "") or "תקן 21 ס' 4.14(ד)", NIS0)
 
         tax = p.get("tax", {}) or {}
+        for key, label in [("purchase_tax_on_tenant_rights", "מס רכישה בגין רכישת זכויות הדיירים"),
+                           ("vat_on_tenant_construction", "מע\"מ על שירותי בנייה לדיירים (שאינו בר-קיזוז)")]:
+            if num(tax.get(key)):
+                add("דיירים", key, label, num(tax.get(key)), "₪",
+                    tax.get(key + "_source", "") or "תקן 21 ס' 4.14(ה)", NIS0)
+
         add("מיסוי", "vat", "שיעור מע\"מ", num(tax.get("vat_pct"), 18), "%", "tax-rules.md")
         add("מיסוי", "profit_tax", "שיעור מס על הרווח (%s)" %
             ("חברה" if self.m["developer_type"] == "company" else "יחיד"),
@@ -365,12 +371,21 @@ class Builder:
                 ], fmts=[None, None, PCT, NIS0, None])
 
         tenants = self.m.get("tenants", {}) or {}
-        if tenants.get("lines"):
+        tax_keys = [k for k in ("purchase_tax_on_tenant_rights", "vat_on_tenant_construction")
+                    if k in R]
+        if tenants.get("lines") or tax_keys:
             t_first = r
-            for i, line in enumerate(tenants["lines"]):
+            for i, line in enumerate(tenants.get("lines") or []):
                 r = self.line(ws, r, [line["label"], "עלויות טיפול בדיירים", "",
                                       "=%s" % R["tenant_%d" % i],
                                       line.get("source", "") or "תקן 21 ס' 4.14(ד)"],
+                              fmts=[None, None, None, NIS0, None])
+            for key in tax_keys:
+                label = ("מס רכישה בגין רכישת זכויות הדיירים"
+                         if key == "purchase_tax_on_tenant_rights"
+                         else "מע\"מ על שירותי בנייה לדיירים (שאינו בר-קיזוז)")
+                r = self.line(ws, r, [label, "מיסוי פינוי-בינוי", "", "=%s" % R[key],
+                                      "תקן 21 ס' 4.14(ה)"],
                               fmts=[None, None, None, NIS0, None])
             r = self.line(ws, r, ["מזה — סה\"כ עלויות הטיפול בדיירים", "", "",
                                   "=SUM(D%d:D%d)" % (t_first, r - 1), ""],
@@ -778,6 +793,52 @@ class Builder:
             operator="lessThan", formula=[str(th)], fill=PatternFill("solid", fgColor=RED)))
         return ws
 
+    # -- 12. תמורות לדיירים (תקן 21 חלקים ב'-ג') ----------------------------
+
+    def build_tenant_consideration(self):
+        """גיליון התמורות. קיים רק כשהוזנו נתוני דירות — הוא לא ממציא שוויים.
+
+        השוויים כאן הם קלט של שמאי, לא תוצר של המודל, ולכן הם נכתבים כערכים
+        ולא כנוסחאות. מה שכן מחושב הוא הפער והיחס, והם נוסחאות חיות כדי שאפשר
+        יהיה לשחק בשווי ולראות את היחס זז."""
+        from model import tenant_consideration
+        tc = tenant_consideration(self.p)
+        if not tc["typical"] and not tc["specific"]:
+            return None
+        ws = self.sheet("תמורות לדיירים", [30, 10, 14, 20, 14, 20, 18, 20, 10, 26])
+        r = self.title(ws, 1, "תמורות לדיירים — תקן 21 חלקים ב' ו-ג'", 10)
+        r = self.note(ws, r,
+                      "השוויים לפני ואחרי הם קלט של שמאי מקרקעין ואינם נקבעים על ידי "
+                      "הכלי. הפער והיחס מחושבים בנוסחה חיה.", 10)
+
+        for title, rows, with_extras in [
+                ("חלק ב' — דירות אופייניות (ס' 5.11–5.13)", tc["typical"], False),
+                ("חלק ג' — דירות מסוימות (ס' 6.11–6.13)", tc["specific"], True)]:
+            if not rows:
+                continue
+            r = self.line(ws, r, [title], bold=True)
+            r = self.header(ws, r, ["דירה", "כמות", "שטח קיים", "שווי לפני", "שטח חדש",
+                                    "שווי אחרי", "הצמדות", "פער", "יחס", "מקור"])
+            first = r
+            for t in rows:
+                r = self.line(ws, r, [
+                    t["label"], t["count"], t["existing_sqm"], t["existing_value"],
+                    t["new_sqm"], t["new_value"], t["extras_total"],
+                    "=F%d+G%d-D%d" % (r, r, r),
+                    "=IFERROR((F%d+G%d)/D%d,\"\")" % (r, r, r),
+                    t.get("source") or "—",
+                ], fmts=[None, QTY, SQM, NIS0, SQM, NIS0, NIS0, NIS0, '0.00', None])
+            r = self.line(ws, r, ["סה\"כ", "=SUM(B%d:B%d)" % (first, r - 1), "",
+                                  "=SUMPRODUCT(B%d:B%d,D%d:D%d)" % (first, r - 1, first, r - 1),
+                                  "", "=SUMPRODUCT(B%d:B%d,F%d:F%d)" % (first, r - 1, first, r - 1),
+                                  "", "=SUMPRODUCT(B%d:B%d,H%d:H%d)" % (first, r - 1, first, r - 1),
+                                  "", ""],
+                          fmts=[None, QTY, None, NIS0, None, NIS0, None, NIS0, None, None],
+                          bold=True, fill=TOT_FILL)
+            r += 1
+        self.note(ws, r, DISCLAIMER, 10)
+        return ws
+
     # -- 11. דגלים אדומים --------------------------------------------------
 
     def build_flags(self):
@@ -824,6 +885,7 @@ class Builder:
         self.build_results()
         self._inject_terminal_flow()
         self.build_sensitivity()
+        self.build_tenant_consideration()
         self.build_flags()
         self._reorder()
         self.wb.save(path)
@@ -856,7 +918,7 @@ class Builder:
     def _reorder(self):
         order = [ASSUMPTIONS_SHEET, "קרקע ורכישה", "עלויות בנייה ישירות", "עלויות עקיפות",
                  "מימון", "בצמ ומיסוי", "הכנסות", "תזרים רבעוני", "תוצאות",
-                 "ניתוחי רגישות", "דגלים אדומים"]
+                 "ניתוחי רגישות", "תמורות לדיירים", "דגלים אדומים"]
         self.wb._sheets = [self.wb[name] for name in order if name in self.wb.sheetnames]
 
 
