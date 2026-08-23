@@ -3,17 +3,17 @@
     {
       "text": "נוצרו כל ארבעת התוצרים: xlsx, docx, pptx, html",
       "passed": false,
-      "evidence": "xlsx=0 docx=0 pptx=0 html=0"
+      "evidence": "xlsx=1 docx=0 pptx=0 html=0"
     },
     {
       "text": "קובץ ה-Excel מכיל נוסחאות חיות (תאים שמתחילים ב-=) ולא רק ערכים קשיחים",
-      "passed": false,
-      "evidence": "נמצאו 0 נוסחאות ב-0 גיליונות"
+      "passed": true,
+      "evidence": "נמצאו 359 נוסחאות ב-6 גיליונות"
     },
     {
       "text": "כל גיליונות ה-Excel מוגדרים RTL (sheetView rightToLeft)",
-      "passed": false,
-      "evidence": "0 מתוך 0 גיליונות RTL"
+      "passed": true,
+      "evidence": "6 מתוך 6 גיליונות RTL"
     },
     {
       "text": "גילוי הנאות ('אינו מהווה דוח אפס של שמאי מקרקעין מוסמך') מופיע ב-Word, ב-PPTX וב-HTML",
@@ -42,12 +42,12 @@
     },
     {
       "text": "180 דירות התמורה לדיירים (48 יח\"ד) אינן נספרות כהכנסה ממכירה",
-      "passed": false,
+      "passed": true,
       "evidence": "בדיקה אוטומטית על טקסט התוצרים"
     },
     {
       "text": "עלויות הדיירים (שכר דירה, הובלה, ליווי) מופיעות כשורות עלות מפורשות",
-      "passed": false,
+      "passed": true,
       "evidence": "בדיקה אוטומטית על טקסט התוצרים"
     },
     {
@@ -56,5 +56,5 @@
       "evidence": "בדיקה אוטומטית על טקסט התוצרים"
     }
   ],
-  "score": 0.0
+  "score": 0.36363636363636365
 }

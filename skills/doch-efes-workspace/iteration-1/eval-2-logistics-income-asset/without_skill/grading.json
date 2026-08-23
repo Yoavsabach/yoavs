@@ -3,7 +3,7 @@
     {
       "text": "נוצרו כל ארבעת התוצרים: xlsx, docx, pptx, html",
       "passed": false,
-      "evidence": "xlsx=1 docx=0 pptx=0 html=0"
+      "evidence": "xlsx=1 docx=1 pptx=0 html=0"
     },
     {
       "text": "קובץ ה-Excel מכיל נוסחאות חיות (תאים שמתחילים ב-=) ולא רק ערכים קשיחים",

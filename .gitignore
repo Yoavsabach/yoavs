@@ -11,3 +11,4 @@ skills/*-workspace/iteration-*/**/outputs/
 
 __pycache__/
 *.pyc
+skills/*-workspace/review-*.html
